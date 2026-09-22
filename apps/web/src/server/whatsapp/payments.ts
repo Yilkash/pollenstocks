@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { getAddress, zeroAddress, formatUnits, parseUnits } from "viem";
 import { seal, senderLookup } from "./config";
+import { contactList, contactById, contactByName } from "./contacts";
 import { actionFor, text } from "./menu";
 
 export const PAYMENT_TOKEN = "0x13800afeea6f8688547770052b395099758d9a5b";
@@ -177,9 +178,34 @@ export function paymentReply(
     db.prepare(
       "INSERT INTO wa_payment_sessions(account_id,stage,expires) VALUES(?,'address',?) ON CONFLICT(account_id) DO UPDATE SET stage='address',destination=NULL,expires=excluded.expires",
     ).run(wallet.id, now + 600000);
-    return text(
-      "Where should I send Demo USD?\n\nEnter the recipient’s 0x wallet address on Robinhood Chain testnet. Type Cancel to stop.",
-    );
+    db.prepare("DELETE FROM wa_payment_recipient_labels WHERE account_id=?").run(wallet.id);
+    return {
+      type: "interactive",
+      interactive: {
+        type: "button",
+        body: {
+          text: "Where should I send Demo USD? Choose a saved contact, enter their name, or paste a Robinhood testnet wallet address. Type Cancel to stop.",
+        },
+        action: {
+          buttons: [
+            { type: "reply", reply: { id: "paycontact:page:0", title: "Saved contact" } },
+            { type: "reply", reply: { id: "paycontact:address", title: "Wallet address" } },
+          ],
+        },
+      },
+    };
+  }
+  if (command.startsWith("paycontact:")) {
+    if (!session || session.stage !== "address" || session.expires <= now)
+      return text(
+        "This recipient selection expired or was already used. Choose Send payment to start again.",
+      );
+    if (/^paycontact:page:\d{1,3}$/.test(command))
+      return contactList(db, key, wallet.id, "send", Number(command.split(":")[2]));
+    if (command === "paycontact:address")
+      return text("Enter the recipient’s 0x wallet address on Robinhood Chain testnet.");
+    if (!/^paycontact:pick:[a-f0-9-]{36}$/.test(command))
+      return text("Choose a contact from a fresh Send payment menu.");
   }
   if (
     action ||
@@ -195,7 +221,10 @@ export function paymentReply(
   }
   if (session.stage === "address") {
     try {
-      const address = getAddress(command);
+      const contact = command.startsWith("paycontact:pick:")
+        ? contactById(db, key, wallet.id, command.split(":")[2])
+        : contactByName(db, key, wallet.id, command);
+      const address = getAddress(contact?.address ?? command);
       if (
         address === zeroAddress ||
         address.toLowerCase() === PAYMENT_TOKEN ||
@@ -205,8 +234,14 @@ export function paymentReply(
       db.prepare(
         "UPDATE wa_payment_sessions SET stage='amount',destination=?,expires=? WHERE account_id=?",
       ).run(address, now + 600000, wallet.id);
+      db.prepare("DELETE FROM wa_payment_recipient_labels WHERE account_id=?").run(wallet.id);
+      if (contact)
+        db.prepare("INSERT INTO wa_payment_recipient_labels(account_id,payload) VALUES(?,?)").run(
+          wallet.id,
+          seal({ name: contact.name }, key),
+        );
       return text(
-        `Recipient:\n${address}\n\nHow much Demo USD? Enter an amount up to 1,000, with no more than 6 decimal places.`,
+        `Recipient:\n${contact ? contact.name + "\n" : ""}${address}\n\nHow much Demo USD? Enter an amount up to 1,000, with no more than 6 decimal places.`,
       );
     } catch {
       return text(
@@ -245,6 +280,16 @@ export function paymentReply(
     randomUUID(),
     "steward_pay_" + id,
   );
+  // Freeze the selected display name along with the already captured address.
+  const label = db
+    .prepare("SELECT payload FROM wa_payment_recipient_labels WHERE account_id=?")
+    .get(wallet.id) as { payload: string } | undefined;
+  if (label)
+    db.prepare("INSERT INTO wa_payment_contact_labels(payment_id,payload) VALUES(?,?)").run(
+      id,
+      label.payload,
+    );
+  db.prepare("DELETE FROM wa_payment_recipient_labels WHERE account_id=?").run(wallet.id);
   db.prepare("DELETE FROM wa_payment_sessions WHERE account_id=?").run(wallet.id);
   return { _steward_type: "payment_review", payment_id: id };
 }

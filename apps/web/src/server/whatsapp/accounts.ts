@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { migrateContacts, contactsReply } from "./contacts";
 import { migratePayments, paymentReply } from "./payments";
 import { senderLookup } from "./config";
 import { actionFor, menu, text } from "./menu";
@@ -31,6 +32,7 @@ export function migrateAccounts(db: DatabaseSync) {
   `);
   migrateWalletSetup(db);
   migratePayments(db);
+  migrateContacts(db);
 }
 // Invoked inside the inbox/outbox transaction; account creation, consuming consent and
 // enqueueing its reply succeed together. No provider/network work belongs in this function.
@@ -48,6 +50,8 @@ export function accountReply(
     return text(
       "This account is paused. Contact the Steward operator for recovery. No wallet action was performed.",
     );
+  const contact = account && contactsReply(db, key, account.id, message.input);
+  if (contact) return contact;
   const payment = paymentReply(db, key, message);
   if (payment) return payment;
   if (message.input.startsWith("walletsetup:")) {

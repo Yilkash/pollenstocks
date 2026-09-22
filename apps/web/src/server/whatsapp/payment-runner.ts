@@ -14,6 +14,7 @@ import {
 } from "viem";
 import { seal, unseal, senderLookup } from "./config";
 import { text } from "./menu";
+import { paymentContactLabel } from "./contacts";
 import {
   PAYMENT_TOKEN,
   PER_PAYMENT,
@@ -150,7 +151,7 @@ export async function reviewPayment(db: DatabaseSync, key: Buffer, phone: string
       interactive: {
         type: "button",
         body: {
-          text: `Review payment\n\nSend: ${formatUnits(BigInt(p.amount), 6)} Demo USD\nTo: ${p.destination}\n\nNetwork: Robinhood Chain testnet\nEstimated fee: ${formatEther(estimate * price)} test ETH\nMaximum fee: ${formatEther(cap)} test ETH\n\nLimit: 1,000 per payment / 5,000 per rolling 24 hours. Test assets have no monetary value.\n\nConfirm within 10 minutes.`,
+          text: `Review payment\n\nSend: ${formatUnits(BigInt(p.amount), 6)} Demo USD\nTo: ${paymentContactLabel(db, key, p.id) ? paymentContactLabel(db, key, p.id) + "\n" : ""}${p.destination}\n\nNetwork: Robinhood Chain testnet\nEstimated fee: ${formatEther(estimate * price)} test ETH\nMaximum fee: ${formatEther(cap)} test ETH\n\nLimit: 1,000 per payment / 5,000 per rolling 24 hours. Test assets have no monetary value.\n\nConfirm within 10 minutes.`,
         },
         action: {
           buttons: [
@@ -412,7 +413,7 @@ export async function processPayment(db: DatabaseSync, key: Buffer, allowed: Set
     update(
       "confirmed",
       null,
-      `Payment complete ✅\n\n${formatUnits(BigInt(p.amount), 6)} Demo USD\nTo: ${p.destination}\nNetwork fee: ${formatEther(receipt.gasUsed * receipt.effectiveGasPrice)} test ETH\n\nhttps://explorer.testnet.chain.robinhood.com/tx/${hash}`,
+      `Payment complete ✅\n\n${formatUnits(BigInt(p.amount), 6)} Demo USD\nTo: ${paymentContactLabel(db, key, p.id) ? paymentContactLabel(db, key, p.id) + "\n" : ""}${p.destination}\nNetwork fee: ${formatEther(receipt.gasUsed * receipt.effectiveGasPrice)} test ETH\n\nhttps://explorer.testnet.chain.robinhood.com/tx/${hash}`,
     );
   } catch {
     if (submitted)

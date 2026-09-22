@@ -220,3 +220,22 @@ instead of the immediate acknowledgement text. The final receipt is unchanged. A
 checking message is only queued if reconciliation remains unresolved for at least
 30 seconds; failures still receive an explicit response. TypeScript compilation passed;
 the worker was restarted. No payment was submitted to exercise this visual change.
+
+## September 22 — saved WhatsApp contacts
+
+Added Manage contacts → Add contact, paginated contact lists, details, edit and confirmed
+delete. Contact names and addresses are encrypted; case-insensitive normalized name
+indexes use keyed hashes and are unique within each account. Actions and drafts are
+scoped to the verified account. Drafts expire in ten minutes, confirmations are single-use,
+and edits/deletes check the captured contact version. Names are limited to 24 characters;
+each account can save up to 100 contacts. Switching to contact management clears unfinished
+recipient/amount entry without changing already reviewed or submitted payments.
+
+Send payment offers Saved contact or Wallet address, and accepts a saved name during
+recipient entry. Both selected name and address are frozen for the payment: later contact
+edits cannot change its destination. Review and receipt show the captured name plus full
+address. Raw address transfers retain their existing flow and confirmation requirements.
+
+TypeScript compilation passed and the worker restarted. No automated tests were added
+or run for this milestone. Live add/edit/delete and contact payment checks remain for
+the user's next WhatsApp interaction; no contacts or payments were created on their behalf.
