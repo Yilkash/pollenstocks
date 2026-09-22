@@ -120,6 +120,7 @@ export function accountReply(
   if (["hi", "hello", "menu", "start"].includes(command)) return menu(!!account);
   if (action && ["balance", "send", "receive", "history", "contacts"].includes(action)) {
     const wallet = account && walletAddress(db, account.id);
+    if (wallet && action === "balance") return { _steward_type: "balance" };
     if (wallet)
       return action === "receive"
         ? readyAccount(wallet.address)

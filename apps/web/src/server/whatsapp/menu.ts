@@ -34,6 +34,7 @@ export function menu(hasAccount = false) {
 }
 export function actionFor(input: string) {
   const command = input.trim().toLowerCase().replace(/^\//, "");
+  if (["balance", "my balance", "check balance"].includes(command)) return "balance";
   const action = actions.find(
     ([id, label], index) =>
       command === "menu:" + id || command === label.toLowerCase() || command === String(index + 1),

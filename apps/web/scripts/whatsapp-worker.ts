@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
-import { deliveryConfig, unseal, whatsappConfig } from "../src/server/whatsapp/config";
+import { deliveryConfig, seal, unseal, whatsappConfig } from "../src/server/whatsapp/config";
+import { balanceReply } from "../src/server/whatsapp/balance";
 import { provisionWallet } from "../src/server/whatsapp/provision-wallet";
 import { WhatsAppStore } from "../src/server/whatsapp/store";
 
@@ -21,10 +22,17 @@ async function main() {
       const job = store.claim();
       if (job) {
         try {
-          const payload = unseal<{ to: string } & Record<string, unknown>>(job.payload, config.key);
+          let payload = unseal<{ to: string } & Record<string, unknown>>(job.payload, config.key);
           if (!config.allowed.has(payload.to)) {
             store.finish(job.id, "blocked", null, "sender_removed");
             continue;
+          }
+          if (payload._steward_type === "balance") {
+            payload = { to: payload.to, ...(await balanceReply(store.db, config.key, payload.to)) };
+            // Persist the resolved reply before delivery so stored output remains reviewable.
+            store.db
+              .prepare("UPDATE wa_outbox SET payload=? WHERE id=? AND state='sending'")
+              .run(seal(payload, config.key), job.id);
           }
           const typing = payload._steward_type === "typing";
           const response = await fetch(

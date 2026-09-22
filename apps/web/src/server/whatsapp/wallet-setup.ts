@@ -44,7 +44,7 @@ export function walletAddress(db: DatabaseSync, accountId: string) {
 }
 export function readyAccount(address: string) {
   return text(
-    `Your Steward test wallet is ready.\n\nNetwork: Robinhood Chain testnet\nWallet address:\n${address}\n\nOnly use Robinhood testnet assets here. Demo USD has no monetary value. Wallet setup does not add funds. Sending payments and live balance display are not available in WhatsApp yet.\n\nType Menu to return.`,
+    `Your Steward test wallet is ready.\n\nNetwork: Robinhood Chain testnet\nWallet address:\n${address}\n\nOnly use Robinhood testnet assets here. Demo USD has no monetary value. Wallet setup does not add funds. Choose View balance to see your funds. Sending payments is not available in WhatsApp yet.\n\nType Menu to return.`,
   );
 }
 // Called only inside the inbox transaction. No network operations here.

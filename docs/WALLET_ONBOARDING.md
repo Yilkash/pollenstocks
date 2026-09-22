@@ -164,3 +164,18 @@ dependent. Ambiguous message deliveries retain the existing no-automatic-retry b
 TypeScript compilation passed and the worker was restarted. No new automated tests or
 live wallet creation were run for this UX change. Native request shape follows
 [Meta's typing indicator example](https://www.postman.com/meta/whatsapp-business-platform/request/lhf0duq/send-typing-indicator-and-read-receipt).
+
+## September 22 — WhatsApp live balance command
+
+View balance, Balance, My balance and Check balance now resolve the active sender's
+registered wallet and read Demo USD and test ETH on Robinhood testnet. Reads check
+chain 46630, use the deployed Demo USD contract, validate six decimals, and fetch both
+balances at one block. Stale blocks older than two minutes or failed reads return an
+unavailable message rather than fabricated zero balances. Amounts use bigint formatting.
+The RPC calls happen outside the SQLite inbox transaction; the resulting encrypted reply
+is saved before outbound delivery. Paused accounts are rechecked after RPC completion.
+This code cannot sign, fund or send a payment.
+
+TypeScript compilation passed and the worker was restarted. No automated tests were
+added/run and no funds were moved for this change. The next user interaction is
+**View balance** in WhatsApp to check the live reply.
