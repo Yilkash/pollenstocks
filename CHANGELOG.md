@@ -51,3 +51,11 @@ Compilation checkpoint: `npm run build` passes (including TypeScript); `forge bu
 - Existing messages containing a draft ID also display current payment status, replacing stale draft instructions after submission.
 - Resolve saved contact names by address for new drafts and previously unnamed payment records; recipient addresses remain unchanged.
 - Production build passes. Browser behavior and recovery scenarios still require verification.
+
+## 2026-09-22 — Wallet-session reliability
+
+- Ignore repeated account/network events when the wallet is unchanged; reuse valid signed sessions on reconnect.
+- Guard session restoration, stale balance/history responses, and rapid duplicate action clicks.
+- Recognize wallet rejection through nested provider errors while preserving unknown outcomes.
+- Passed 10 backend tests, 8 browser regressions and 4 contract tests (including 256 fuzz runs). Production compilation passed.
+- Added test commands and CI coverage. See docs/RELIABILITY.md for isolation, coverage and remaining limits.

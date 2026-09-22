@@ -19,6 +19,7 @@ export default function Home() {
     review,
     messages,
     busy,
+    initializing,
     error,
     notice,
     receive,
@@ -78,7 +79,7 @@ export default function Home() {
           </span>
           <button
             className="wallet-button"
-            disabled={busy || !config}
+            disabled={busy || initializing || !config}
             onClick={() => void run(toggleWallet)}
           >
             <Wallet size={16} />

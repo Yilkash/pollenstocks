@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type Address, type Hex, parseAbi } from "viem";
-import { api, assertWallet, connectWallet, walletClient } from "@/lib/browser";
+import { api, assertWallet, connectWallet, walletClient, isWalletRejection } from "@/lib/browser";
 import {
   transferData,
   validateForSigning,
@@ -30,13 +30,29 @@ export function usePaymentWorkspace() {
     [name, setName] = useState(""),
     [contactAddress, setContactAddress] = useState("");
   const [recovery, setRecovery] = useState("");
+  const [initializing, setInitializing] = useState(true);
+  const actionInFlight = useRef(false);
+  const generation = useRef(0);
+  function clearWalletView() {
+    generation.current++;
+    setWallet(null);
+    setBalance(null);
+    setContacts([]);
+    setPayments([]);
+    setReview(null);
+    setMessages([]);
+    setReceive(false);
+    setRecovery("");
+  }
   async function load() {
+    const requestedGeneration = generation.current;
     const results = await Promise.allSettled([
       api<{ eth: string; token: string | null }>("balances"),
       api<Contact[]>("contacts"),
       api<Payment[]>("payments"),
       api<Message[]>("chat"),
     ]);
+    if (requestedGeneration !== generation.current) return;
     if (results[0].status === "fulfilled") setBalance(results[0].value);
     else setError(results[0].reason.message);
     if (results[1].status === "fulfilled") setContacts(results[1].value);
@@ -44,6 +60,9 @@ export function usePaymentWorkspace() {
     if (results[3].status === "fulfilled") setMessages(results[3].value);
   }
   async function run(fn: () => Promise<void>) {
+    // React state updates are asynchronous; the ref closes the duplicate-click window.
+    if (actionInFlight.current) return;
+    actionInFlight.current = true;
     setBusy(true);
     setError("");
     setNotice("");
@@ -52,46 +71,66 @@ export function usePaymentWorkspace() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed.");
     } finally {
+      actionInFlight.current = false;
       setBusy(false);
     }
   }
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
       try {
         const c = await api<AppConfig>("config");
+        if (cancelled) return;
         setConfig(c);
-        const s = await api<{ wallet: Address | null }>("session");
-        if (s.wallet) {
-          await assertWallet(c, s.wallet);
-          setWallet(s.wallet);
+        const session = await api<{ wallet: Address | null }>("session");
+        if (cancelled) return;
+        if (session.wallet) {
+          // Extensions may inject their provider after React mounts. Wait without prompting.
+          for (let i = 0; i < 15 && !window.ethereum && !cancelled; i++)
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          if (cancelled) return;
+          await assertWallet(c, session.wallet);
+          if (cancelled) return;
+          setWallet(session.wallet);
           await load();
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Could not connect.");
+        if (!cancelled)
+          setError(e instanceof Error ? e.message : "Could not restore wallet session.");
+      } finally {
+        if (!cancelled) setInitializing(false);
       }
     })();
+    return () => {
+      cancelled = true;
+      generation.current++;
+    };
   }, []);
   useEffect(() => {
-    if (!wallet) return;
+    if (!wallet || !config) return;
     const provider = window.ethereum;
     const reset = () => {
-      setWallet(null);
-      setBalance(null);
-      setContacts([]);
-      setPayments([]);
-      setReview(null);
-      setMessages([]);
-      setReceive(false);
-      void api("session", undefined, "DELETE").catch(() => {});
-      setError("Wallet or network changed. Connect again.");
+      clearWalletView();
+      // Do not delete the server session here: delayed events must not erase a new login.
+      // Explicit disconnect still revokes it, and every signing action checks the wallet.
+      setError("Wallet account or network changed. Reconnect to continue.");
     };
-    provider?.on?.("accountsChanged", reset);
-    provider?.on?.("chainChanged", reset);
+    const accountsChanged = (...args: unknown[]) => {
+      const accounts = args[0];
+      if (Array.isArray(accounts) && accounts[0]?.toLowerCase() === wallet.toLowerCase()) return;
+      reset();
+    };
+    const chainChanged = (...args: unknown[]) => {
+      if (Number(args[0]) === config.chainId) return;
+      reset();
+    };
+    provider?.on?.("accountsChanged", accountsChanged);
+    provider?.on?.("chainChanged", chainChanged);
     return () => {
-      provider?.removeListener?.("accountsChanged", reset);
-      provider?.removeListener?.("chainChanged", reset);
+      provider?.removeListener?.("accountsChanged", accountsChanged);
+      provider?.removeListener?.("chainChanged", chainChanged);
     };
-  }, [wallet]);
+  }, [wallet, config]);
   const key = (p: Payment) =>
     "steward-hash:" + p.chainId + ":" + p.sender.toLowerCase() + ":" + p.id;
   async function send() {
@@ -138,10 +177,8 @@ export function usePaymentWorkspace() {
       setNotice("Transaction submitted. Refresh its receipt to check inclusion.");
     } catch (e) {
       if (!hash) {
-        const err = e as { code?: number; cause?: { code?: number } };
         // Only an explicit rejection is safe to release; ambiguous outcomes need recovery.
-        const status =
-          !requested || err.code === 4001 || err.cause?.code === 4001 ? "rejected" : "unknown";
+        const status = !requested || isWalletRejection(e) ? "rejected" : "unknown";
         try {
           setReview(await api<Payment>("payments/" + p.id + "/outcome", { status }));
         } catch {
@@ -165,13 +202,7 @@ export function usePaymentWorkspace() {
   async function toggleWallet() {
     if (wallet) {
       await api("session", undefined, "DELETE");
-      setWallet(null);
-      setBalance(null);
-      setContacts([]);
-      setPayments([]);
-      setMessages([]);
-      setReview(null);
-      setReceive(false);
+      clearWalletView();
     } else {
       setWallet(await connectWallet(config!));
       await load();
@@ -249,6 +280,7 @@ export function usePaymentWorkspace() {
     review,
     messages,
     busy,
+    initializing,
     error,
     notice,
     receive,

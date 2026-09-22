@@ -30,7 +30,7 @@ forge fmt
 forge build --skip test
 ```
 
-Existing Solidity tests are in `contracts/test`. Running them is a separate action; a successful compilation is not a passing test suite.
+Existing Solidity tests are in `contracts/test`. Run `forge test -vv` for the contract suite. Use `npm test` and `npm run test:browser` from the web directory for backend and browser checks; see docs/RELIABILITY.md for setup and isolation.
 
 ## Commits
 

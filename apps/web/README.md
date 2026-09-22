@@ -12,7 +12,7 @@ Wallet-to-wallet test payments on Robinhood Chain, with SERV preparing payment d
 - SQLite contacts, payment history and manual transaction-hash recovery.
 - Six-decimal Demo USD faucet contract, restricted to chain 46630 or local 31337.
 
-This is an implementation milestone, not a verified live deployment. The production web build passes. No end-to-end transfer or authenticated SERV call has been performed.
+This is an implementation milestone, not a verified live deployment. The production web build passes. A live testnet transfer and an authenticated SERV balance-tool call have been verified.
 
 ## Run the web app
 
@@ -65,7 +65,7 @@ This command broadcasts a real testnet deployment and spends test ETH. Copy the 
 7. Check the explorer and wallet B's balance.
 8. Configure SERV and repeat using “Send 5 Demo USD to Ada”.
 
-These steps remain to be executed. No mainnet USDG integration is enabled.
+The initial testnet transfer and SERV balance-tool exchange have been completed. No mainnet USDG integration is enabled.
 
 ## Recovery and current limits
 
@@ -86,7 +86,7 @@ These steps remain to be executed. No mainnet USDG integration is enabled.
 npm run build
 ```
 
-Current build passes, including TypeScript compilation. Automated and live transfer testing remain pending. Testnet-only hackathon eligibility and the authenticated SERV call remain open gates; see [the plan](../../docs/PLAN.md) and [research](../../docs/PAYMENTS_RESEARCH.md).
+Current build passes, including TypeScript compilation. The reliability suite now passes; see [the checkpoint](../../docs/RELIABILITY.md) for coverage and remaining limits. Testnet-only hackathon eligibility remains an open gate; see [the plan](../../docs/PLAN.md) and [research](../../docs/PAYMENTS_RESEARCH.md).
 
 ## Deploy with a browser wallet
 
@@ -95,3 +95,9 @@ Open `/deploy` on the running app. Connect the funded testnet wallet, review the
 The page preserves a pending attempt in browser storage before requesting a signature. If the result is uncertain, recover the hash from wallet activity instead of submitting again. Contract creation input, sender, receipt and deployed code are checked before displaying a verified address.
 
 Deployment bytecode is committed in `src/generated/payment-token.json`. After changing the token contract, compile from `../../contracts` with `forge build --skip test`, then run `npm run export:token` and `npm run format` from this directory. Review the generated artifact with the contract change.
+
+## Reliability checks
+
+Run `npm test` for the isolated backend suite. After `npm run build` and `npx playwright install chromium`, run `npm run test:browser` for the fake-wallet browser suite. No real payment is sent by these checks.
+
+For a preview without development hot reloads, run `npm run build` then `npm run start -- --port 3001` with APP_ORIGIN set to `http://127.0.0.1:3001`.

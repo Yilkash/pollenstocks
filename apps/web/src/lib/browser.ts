@@ -55,7 +55,7 @@ export async function connectWallet(config: AppConfig) {
   const w = walletClient(config);
   const accounts = await w.requestAddresses();
   try {
-    await w.switchChain({ id: config.chainId });
+    if ((await w.getChainId()) !== config.chainId) await w.switchChain({ id: config.chainId });
   } catch (e) {
     if (
       (e as { code?: number }).code !== 4902 &&
@@ -68,6 +68,9 @@ export async function connectWallet(config: AppConfig) {
   const account = accounts[0];
   if (!account) throw new Error("No wallet account selected.");
   await assertWallet(config, account);
+  // A valid session survives reloads and temporary wallet locks. Do not sign in twice.
+  const session = await api<{ wallet: Address | null }>("session");
+  if (session.wallet?.toLowerCase() === account.toLowerCase()) return account;
   const challenge = await api<{ message: string }>("auth/challenge", { address: account });
   const signature = await w.signMessage({ account, message: challenge.message });
   await assertWallet(config, account);
@@ -75,3 +78,15 @@ export async function connectWallet(config: AppConfig) {
   return account;
 }
 export const short = (s: string) => s.slice(0, 6) + "…" + s.slice(-4);
+
+/** Wallet libraries wrap provider errors at different depths. Only code 4001 is rejection. */
+export function isWalletRejection(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  let current = error;
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    if ((current as { code?: number }).code === 4001) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
