@@ -14,7 +14,8 @@
     "format:check": "prettier --check .",
     "export:token": "node scripts/export-token.mjs",
     "test": "tsx --test tests/*.test.ts",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "whatsapp:worker": "node --env-file=.env.local --import tsx scripts/whatsapp-worker.ts"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

@@ -1,6 +1,6 @@
 # Steward Pay — WhatsApp custodial-wallet prototype
 
-Updated September 22, 2026. Status: proposed implementation plan; the WhatsApp wallet/signing flow is not built.
+Updated September 22, 2026. Status: WhatsApp transport/menu foundation implemented locally; wallet/signing flow is not built. See [setup and current limitations](WHATSAPP_SETUP.md).
 
 ## 1. Product decision
 
@@ -25,7 +25,7 @@ Completed:
 - Meta app and test WhatsApp Business Account created; a sample outbound message arrived on the user's phone.
 
 Still needed:
-- Inbound WhatsApp webhook and real SERV replies over WhatsApp.
+- Configure and exercise the new inbound WhatsApp webhook/menu worker; real SERV replies over WhatsApp remain unimplemented.
 - Managed wallet provider account and Robinhood testnet signing proof.
 - Confirmation authorization, durable worker and custody-specific records.
 - Public HTTPS endpoint, runtime secrets and durable hosting.
@@ -35,10 +35,10 @@ Still needed:
 ## 3. User journey
 
 1. User sends “Hi” to the test WhatsApp number.
-2. Steward explains testnet-only funds and service control, then offers Create test wallet / Cancel.
+2. Steward shows the welcome menu below. Create account explains testnet-only funds and service control, then requests explicit consent.
 3. On consent, create exactly one wallet and return its address and network.
 4. Seed a small, capped amount of test ETH and claim Demo USD for that wallet. Track both operations; do not assume an address has gas.
-5. User saves “Sila” with a recipient address and confirms the contact.
+5. User supplies a saved contact name, registered phone number or full wallet address, resolved as described below.
 6. User asks, “Send 5 Demo USD to Sila.”
 7. Steward sends a payment review:
    - recipient alias and full wallet address;
@@ -51,6 +51,46 @@ Still needed:
 A chat reply like “yes” alone never calls the signer. The confirmation button belongs to a specific payment, user and expiry. If the user changes details or the fee exceeds the approved maximum, issue a new review.
 
 Users can ask Balance, Receive, History and Payment status. Cancel before execution means discard the draft; it does not reverse a broadcast transaction.
+
+### Welcome menu
+
+Send the welcome after the first incoming message. Opening a chat alone is not assumed to trigger an event. Typing Menu returns to the menu; natural-language requests remain available throughout.
+
+“Welcome to Steward. Send test payments, check your balance, and chat with your AI assistant—all in WhatsApp.” Clearly label the Demo USD/testnet context.
+
+| Action | Behavior |
+| --- | --- |
+| Create account | Explain service-controlled custody and test funds, obtain consent and create one managed wallet |
+| View balance | Read Demo USD and test ETH balances |
+| Send payment | Collect recipient and amount, then show a review |
+| Receive payment | Show wallet address and Robinhood testnet network |
+| Recent activity | Show payments and their current verified status |
+| Manage contacts | Add, view or edit saved recipients |
+| Ask Steward | Chat with the assistant powered by SERV and authorized tools |
+| Help & settings | Explain custody, limits, test funds, account status and recovery/support |
+
+Wallet actions before signup lead through consent and account creation. After signup, replace Create account with My account. Creation retries return the same wallet. Funding runs as tracked, capped jobs; show pending/failed funding honestly. Check current Meta list constraints during implementation; use a list or paged menu, keeping Confirm/Cancel for payment reviews.
+
+### Recipient resolution
+
+| Input | Backend resolution |
+| --- | --- |
+| “Send 20 to Sila” | Search the sender's saved contacts; if names collide, ask the sender to select |
+| “Send 20 to +234…” | Normalize the number and resolve the enrolled, active Steward recipient's wallet on chain 46630 |
+| “Send 20 to 0x…” | Validate the full EVM address and prepare a direct transfer on chain 46630 |
+
+- Ask for a country code when phone input is ambiguous; never guess from chat language.
+- Recipient enrollment requires their own verified WhatsApp interaction and consent. Ask during onboarding for consent to receiving payments by phone lookup.
+- If no eligible registered recipient exists, explain that the sender needs their wallet address or must ask them to join. Never automatically create someone else's wallet or send an invitation.
+- Resolve numbers in trusted backend code with keyed lookup. Redact numbers before SERV calls and pass opaque recipient references. Avoid raw phone numbers in logs or provider external IDs.
+- Rate-limit lookup; do not expose balances, profile details or a browsable phone directory.
+- Frozen accounts cannot be resolved as phone recipients. Number reassignment/recovery must not silently redirect a saved contact to another account.
+- Validate address length, hex and mixed-case checksum where present; reject the zero address. A valid address does not prove ownership or support for this network.
+- Save contacts as fixed addresses or registered internal recipient IDs with an address snapshot. Require confirmation when saving/editing.
+- This version uses Demo USD; label amounts accordingly and clarify explicit requests for unsupported assets.
+- Every review shows the alias or masked phone reference where applicable, full resolved wallet address, amount, token, network, estimated fee, fee ceiling and expiry.
+- Snapshot the resolved recipient into the immutable intent. If the registered wallet mapping changes before approval, invalidate the review. Never substitute a different address under an existing confirmation.
+- Expired reviews offer a fresh review with renewed checks. Do not automatically send or reset expiry under the old button.
 
 ## 4. Phone identity and custody
 
@@ -113,10 +153,10 @@ Initial hosting: one persistent Node app and one coordinated worker on a persist
 The existing web app scopes records by a signed wallet session. A phone number must never bypass that check.
 
 Introduce:
-- users: internal ID, consent time, account status.
+- users: internal ID, custody consent time, phone lookup consent, account status.
 - channel_accounts: user ID, WhatsApp sender lookup, encrypted contact data, channel status.
 - wallets: user ID, custody mode, provider ID, chain, address, creation request/status.
-- contacts: owner user ID, alias, normalized recipient address.
+- contacts: owner user ID, alias, recipient type, optional registered recipient user ID, normalized address snapshot, version.
 - inbox_messages: unique incoming message ID, user, timestamp, processing state.
 - payment_intents: user, wallet, channel, immutable amount/recipient/token/chain, fee ceiling, expiry, state.
 - confirmations: hashed random button token, intent ID/version, user ID, expiry, consumed time.
@@ -131,11 +171,10 @@ Keep custodial transaction execution separate from the current browser-signing e
 
 ## 8. Confirmation and spending controls
 
-Suggested initial demo limits, configurable before implementation:
-- Maximum 10 DUSD per payment.
-- Maximum 50 DUSD per user per UTC day.
+Configurable testnet controls:
+- Per-payment and per-user daily ceilings are deployment settings. The earlier 10/50 amounts are withdrawn as proposed defaults. Choose explicit finite values before signing is enabled, show them in Help/settings, and fail closed if configuration is missing or invalid.
 - One executing/unresolved payment per wallet.
-- Confirmation expires after 5 minutes.
+- Confirmation expires after 10 minutes by default, configurable. Expiry governs unapproved drafts, not transactions already submitted.
 - A hard test-ETH fee ceiling displayed in the review.
 - Allow only chain 46630, our token contract, and ERC-20 transfer.
 - No token approvals, arbitrary contract calls or mainnet signing.
@@ -178,9 +217,9 @@ For an uncertain operation without a hash, provider request lookup is a required
 | Phase | Work | Done when |
 | --- | --- | --- |
 | 0 — signing proof | Provider account, credentials, testnet policies, small transfer | A managed wallet transfers DUSD on 46630; disallowed chain/token requests fail |
-| 1 — WhatsApp transport | HTTPS webhook, signature validation, inbox, outbox | An allowed tester's “Hi” gets one real reply; replayed webhook does not duplicate work |
+| 1 — WhatsApp transport | HTTPS webhook, signature validation, inbox, outbox | An allowed tester's “Hi” gets the menu; Menu and natural-language routing work; replayed webhooks do not duplicate work |
 | 2 — wallet onboarding | Consent, unique wallet creation, capped funding, balance/receive | Same user gets the same wallet after retries/restarts and can read live balances |
-| 3 — payment review | SERV tools, saved contacts, immutable drafts, buttons | “Send 5 Demo USD to Sila” displays the correct recipient, fee and expiry |
+| 3 — payment review | SERV tools, name/phone/address resolution, contacts, immutable drafts, buttons | All three recipient forms show correct address, fee and expiry; ambiguous/unregistered recipients cannot reach signing |
 | 4 — execution | Atomic confirmation, limits, signer worker, receipts | Confirm produces one verified transfer and an in-WhatsApp receipt; Cancel produces none |
 | 5 — recovery and demo | Failure tests, restart persistence, recording | Full flow works on two phones without wallet popups; failures do not double-send |
 
@@ -194,6 +233,9 @@ Automated, using fake phones, isolated databases and local chain/provider fixtur
 - Forged signatures, wrong business number and unknown sender.
 - Replayed webhook, duplicate wallet-creation request and worker restart.
 - Wrong-user, expired, reused or tampered confirmation.
+- Welcome menu before/after signup and wallet-action consent gates.
+- Name collisions, phone normalization/country ambiguity, unregistered/frozen recipients, lookup throttling and phone redaction.
+- Invalid direct addresses and changed registered wallet mappings.
 - Changed contact, model-invented address, ambiguous currency and prompt injection.
 - Daily limits across concurrent requests and midnight boundary.
 - Insufficient ETH/tokens, simulation revert and fee increase.
@@ -203,7 +245,7 @@ Automated, using fake phones, isolated databases and local chain/provider fixtur
 - Phone-account freeze and global signing pause.
 
 Live demo acceptance:
-Two allowed WhatsApp users onboard -> receive test funding -> check balance -> save recipient -> request 5 DUSD -> confirm -> recipient balance increases -> receipt returned -> restart service -> history persists. No transaction approval popup or private-key entry.
+Two allowed WhatsApp users use the menu -> consent and onboard -> receive test funding -> check balance -> send by saved name, registered phone number and wallet address. Each confirmation produces one matching transfer, recipient balance increase and receipt. Demonstrate Cancel, expired-review renewal and unregistered phone handling without transfers. Restart the service and verify history persists. No transaction approval popup or private-key entry.
 
 No mainnet custody or real-money launch is implied by passing this test.
 
