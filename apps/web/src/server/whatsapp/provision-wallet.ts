@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { createManagedWallet, getManagedWallet, WalletProviderError } from "../wallets/privy";
 import { senderLookup } from "./config";
-import { walletConfiguration, walletSetupEnabled } from "./wallet-setup";
+import { queueWalletNotice } from "./wallet-notices";
+import { text } from "./menu";
+import { readyAccount, walletConfiguration, walletSetupEnabled } from "./wallet-setup";
 
 type Job = {
   account_id: string;
@@ -50,6 +52,17 @@ export async function provisionWallet(db: DatabaseSync, allowed: Set<string>, ke
     db.prepare(
       "UPDATE wa_wallet_provisioning SET state=?,error=?,lease=NULL,lease_until=NULL,next_check=? WHERE account_id=? AND lease=?",
     ).run(state, error, Date.now() + 60000, selected.account_id, lease);
+    queueWalletNotice(
+      db,
+      key,
+      selected.account_id,
+      "delayed",
+      text(
+        state === "blocked"
+          ? "Wallet setup needs an operator check. Your request is saved; you don’t need to submit it again."
+          : "Wallet setup is taking longer than expected. Your request is saved, and I’ll send your address here when it’s ready.",
+      ),
+    );
   }
   try {
     const config = walletConfiguration();
@@ -103,6 +116,7 @@ export async function provisionWallet(db: DatabaseSync, allowed: Set<string>, ke
         db.prepare(
           "UPDATE wa_wallet_provisioning SET state='ready',lease=NULL,lease_until=NULL,error=NULL WHERE account_id=? AND lease=?",
         ).run(job.account_id, lease);
+        queueWalletNotice(db, key, job.account_id, "ready", readyAccount(wallet.address));
         db.prepare("UPDATE wa_accounts SET wallet_state='ready' WHERE id=?").run(job.account_id);
         db.prepare("UPDATE wa_wallet_requests SET state='ready' WHERE account_id=?").run(
           job.account_id,

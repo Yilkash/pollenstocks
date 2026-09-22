@@ -26,6 +26,7 @@ async function main() {
             store.finish(job.id, "blocked", null, "sender_removed");
             continue;
           }
+          const typing = payload._steward_type === "typing";
           const response = await fetch(
             `https://graph.facebook.com/${delivery.version}/${config.phoneId}/messages`,
             {
@@ -34,12 +35,17 @@ async function main() {
                 Authorization: `Bearer ${delivery.token}`,
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({
-                ...payload,
-                messaging_product: "whatsapp",
-                recipient_type: "individual",
-              }),
-              signal: AbortSignal.timeout(15_000),
+              body: JSON.stringify(
+                typing
+                  ? {
+                      messaging_product: "whatsapp",
+                      status: "read",
+                      message_id: payload.message_id,
+                      typing_indicator: { type: "text" },
+                    }
+                  : { ...payload, messaging_product: "whatsapp", recipient_type: "individual" },
+              ),
+              signal: AbortSignal.timeout(typing ? 5_000 : 15_000),
               redirect: "error",
             },
           );
@@ -57,13 +63,16 @@ async function main() {
               `http_${response.status}${metaCode}`,
             );
           } else {
-            const body = (await response.json()) as { messages?: { id?: string }[] };
+            const body = (await response.json()) as {
+              success?: boolean;
+              messages?: { id?: string }[];
+            };
             const id = body.messages?.[0]?.id;
             store.finish(
               job.id,
-              id ? "accepted" : "unknown",
+              id || (typing && body.success === true) ? "accepted" : "unknown",
               id || null,
-              id ? null : "missing_message_id",
+              id || (typing && body.success === true) ? null : "missing_message_id",
             );
           }
         } catch {

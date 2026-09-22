@@ -147,3 +147,20 @@ confirmation was generated or accepted on the user's behalf. Live consent-to-wal
 creation is awaiting that interaction. Funding, balances and payments remain separate
 follow-up work. Unknown creation outcomes continue to use lookup only; operator review
 may be needed when a submitted request never reached the provider.
+
+## September 22 — automatic wallet-ready reply
+
+New wallet confirmations now enqueue a native typing/read indicator instead of the
+instruction to ask for the account again. Recipient and response-window expiry are
+stored encrypted in `wa_wallet_notices` in the same transaction as consent handling.
+When provisioning commits a wallet, it also inserts a stable-ID completion reply into
+the outbox. Reconciliation after an interrupted creation uses the same completion path.
+Unknown or blocked setup emits one status update; completion still follows when ready.
+Delivery respects the existing allowlist and 23-hour response window. Old completed
+wallets are not notified again by this migration. Typing requests are best-effort and
+never block wallet creation on a Meta error; actual UI appearance remains client/API
+dependent. Ambiguous message deliveries retain the existing no-automatic-retry behavior.
+
+TypeScript compilation passed and the worker was restarted. No new automated tests or
+live wallet creation were run for this UX change. Native request shape follows
+[Meta's typing indicator example](https://www.postman.com/meta/whatsapp-business-platform/request/lhf0duq/send-typing-indicator-and-read-receipt).

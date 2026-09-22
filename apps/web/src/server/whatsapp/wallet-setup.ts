@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { text } from "./menu";
+import { migrateWalletNotices } from "./wallet-notices";
 
 const VERSION = "steward-wallet-setup-v1";
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -34,6 +35,7 @@ export function migrateWalletSetup(db: DatabaseSync) {
       external_id TEXT NOT NULL UNIQUE, created INTEGER NOT NULL
     );
   `);
+  migrateWalletNotices(db);
 }
 export function walletAddress(db: DatabaseSync, accountId: string) {
   return db.prepare("SELECT address FROM wa_managed_wallets WHERE account_id=?").get(accountId) as
@@ -62,7 +64,7 @@ export function walletSetupReply(
     return text(
       job.state === "blocked"
         ? "Wallet setup needs an operator check. Your request is saved. Type Menu to return."
-        : "Your wallet setup request is saved and is being checked. Choose My account again shortly to see its address. No funds have been added.",
+        : "Your wallet setup is in progress. I’ll send your address here automatically when it’s ready.",
     );
   if (!walletSetupEnabled())
     return text(
@@ -95,9 +97,7 @@ export function walletSetupReply(
       "INSERT INTO wa_wallet_provisioning(account_id,app_id,owner_id,policy_id,consent_at,consent_message_id,consent_version) VALUES(?,?,?,?,?,?,?)",
     ).run(accountId, config.app, config.owner, config.policy, Date.now(), messageId, VERSION);
     db.prepare("UPDATE wa_accounts SET wallet_state='queued' WHERE id=?").run(accountId);
-    return text(
-      "Wallet setup requested. Choose My account again shortly to see your wallet address. Your wallet will start without funds.",
-    );
+    return text("Setting up your test wallet. I’ll send the address here as soon as it’s ready.");
   }
   // A separate consent is needed because the earlier account disclosure deferred wallet creation.
   walletConfiguration();

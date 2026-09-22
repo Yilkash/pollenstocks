@@ -51,19 +51,33 @@ export class WhatsAppStore {
         .all() as { id: string; payload: string }[];
       for (const row of rows) {
         const message = unseal<Incoming>(row.payload, this.key);
-        this.db
-          .prepare("INSERT OR IGNORE INTO wa_outbox(id,payload,expires) VALUES(?,?,?)")
-          .run(
-            row.id,
-            seal(
-              {
-                to: message.from,
-                ...(accountReply(this.db, this.key, message) ?? reply(message.input)),
-              },
-              this.key,
-            ),
-            message.timestamp + 23 * 60 * 60_000,
-          );
+        const response = accountReply(this.db, this.key, message) ?? reply(message.input);
+        const setup = this.db
+          .prepare(
+            "SELECT account_id FROM wa_wallet_provisioning WHERE consent_message_id=? AND state='queued'",
+          )
+          .get(message.id) as { account_id: string } | undefined;
+        if (setup)
+          this.db
+            .prepare(
+              "INSERT OR IGNORE INTO wa_wallet_notices(account_id,recipient,expires) VALUES(?,?,?)",
+            )
+            .run(
+              setup.account_id,
+              seal({ to: message.from }, this.key),
+              message.timestamp + 23 * 60 * 60_000,
+            );
+        this.db.prepare("INSERT OR IGNORE INTO wa_outbox(id,payload,expires) VALUES(?,?,?)").run(
+          row.id,
+          seal(
+            {
+              to: message.from,
+              ...(setup ? { _steward_type: "typing", message_id: message.id } : response),
+            },
+            this.key,
+          ),
+          message.timestamp + 23 * 60 * 60_000,
+        );
         this.db.prepare("UPDATE wa_inbox SET processed=1 WHERE id=?").run(row.id);
       }
       this.db.exec("COMMIT");
