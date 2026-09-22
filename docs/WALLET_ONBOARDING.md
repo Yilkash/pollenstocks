@@ -179,3 +179,35 @@ This code cannot sign, fund or send a payment.
 TypeScript compilation passed and the worker was restarted. No automated tests were
 added/run and no funds were moved for this change. The next user interaction is
 **View balance** in WhatsApp to check the live reply.
+
+## September 22 — confirmed WhatsApp payments
+
+Added address → amount → review → Confirm/Cancel for the registered wallet. The user
+selected **1,000 Demo USD per payment / 5,000 per rolling 24 hours**. Review displays
+the full recipient, testnet, amount, estimated fee and maximum fee; confirmation expires
+in ten minutes. Amount parsing uses six-decimal bigint units. Zero, self and token-contract
+recipients are rejected. Numeric amounts take precedence over numbered menu shortcuts.
+
+Payments persist in `wa_payments`; a partial unique index allows one active payment per
+account. Confirmation is bound to the account, sender and hashed random token and is
+consumed by a state transition inside the inbox transaction. Pending/unknown payments
+reserve daily budget until resolved. The worker checks active account and frozen provider
+configuration, live wallet owner/policy, chain, decimals, balances, simulation, nonce and
+reviewed fee bounds before recording submission. SDK retries and sponsorship are disabled.
+The fee budget cannot exceed 0.0001 test ETH per attempt. No submission happens without
+an accepted confirmation and `WHATSAPP_PAYMENTS_ENABLED=true`.
+
+A recorded submission is never automatically sent again. Recovery uses Privy's
+[reference-ID lookup](https://docs.privy.io/transaction-management/transactions/reference-id)
+and checks the onchain transaction and exact token Transfer receipt after two confirmations.
+Stable outbox IDs prevent duplicate receipt insertion. Recent activity displays recorded
+status and transaction links. An unresolved submission with no provider record remains
+blocked for operator review; it must not be reset or recreated blindly. Message delivery
+still has its existing no-retry rule for ambiguous Meta responses and a 23-hour window.
+
+TypeScript compilation passed and the worker started with confirmed testnet payments
+enabled for the existing sender allowlist. No automated tests were added/run for this
+milestone, and no payment was submitted on the user's behalf. End-to-end payment behavior
+is awaiting the user's first reviewed and confirmed payment. Saved-name/phone recipients,
+transaction replacement and automatic retry of definitively rejected submissions are not
+included. This remains a testnet prototype.

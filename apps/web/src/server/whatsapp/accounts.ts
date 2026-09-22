@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { migratePayments, paymentReply } from "./payments";
 import { senderLookup } from "./config";
 import { actionFor, menu, text } from "./menu";
 import { migrateWalletSetup, walletSetupReply, walletAddress, readyAccount } from "./wallet-setup";
@@ -29,13 +30,14 @@ export function migrateAccounts(db: DatabaseSync) {
     );
   `);
   migrateWalletSetup(db);
+  migratePayments(db);
 }
 // Invoked inside the inbox/outbox transaction; account creation, consuming consent and
 // enqueueing its reply succeed together. No provider/network work belongs in this function.
 export function accountReply(
   db: DatabaseSync,
   key: Buffer,
-  message: { from: string; input: string; id: string },
+  message: { from: string; input: string; id: string; timestamp?: number },
 ) {
   const sender = senderLookup(message.from, key);
   const command = message.input.trim().toLowerCase().replace(/^\//, "");
@@ -46,6 +48,8 @@ export function accountReply(
     return text(
       "This account is paused. Contact the Steward operator for recovery. No wallet action was performed.",
     );
+  const payment = paymentReply(db, key, message);
+  if (payment) return payment;
   if (message.input.startsWith("walletsetup:")) {
     return account
       ? walletSetupReply(db, sender, account.id, message.input, message.id)

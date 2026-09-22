@@ -15,7 +15,7 @@ export function menu(hasAccount = false) {
     interactive: {
       type: "list",
       body: {
-        text: "Welcome to Steward 👋\nYour WhatsApp payment assistant.\n\nRobinhood Chain testnet · Demo USD has no monetary value. Wallet features are being connected.\n\nChoose an option to learn more.",
+        text: "Welcome to Steward 👋\nYour WhatsApp payment assistant.\n\nRobinhood Chain testnet · Demo USD has no monetary value. View your balance, receive funds, or review a Demo USD payment.\n\nChoose an option to learn more.",
       },
       action: {
         button: "Open menu",
@@ -50,7 +50,7 @@ export function reply(input: string) {
     );
   if (action === "help" || command === "help")
     return text(
-      "Steward is a testnet payment prototype. Planned features: send by saved name, registered phone number or wallet address, then review and confirm in WhatsApp. Choose Create account to review the test-account disclosure. Wallet creation and payments are not available yet. Never share a seed phrase or private key. Type Menu to return.",
+      "Steward is a testnet payment prototype. Create your account and wallet, view your balance, or send Demo USD to a wallet address after reviewing and confirming in WhatsApp. Saved names and phone-number recipients are coming later. Limits: 1,000 Demo USD per payment and 5,000 per rolling 24 hours. Never share a seed phrase or private key. Type Menu to return.",
     );
   if (action === "chat")
     return text(

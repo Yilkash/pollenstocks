@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { deliveryConfig, seal, unseal, whatsappConfig } from "../src/server/whatsapp/config";
+import { processPayment, reviewPayment } from "../src/server/whatsapp/payment-runner";
 import { balanceReply } from "../src/server/whatsapp/balance";
 import { provisionWallet } from "../src/server/whatsapp/provision-wallet";
 import { WhatsAppStore } from "../src/server/whatsapp/store";
@@ -15,7 +16,11 @@ async function main() {
   process.on("SIGTERM", () => {
     running = false;
   });
-  console.log("WhatsApp transport worker started (payment execution unavailable).");
+  console.log(
+    process.env.WHATSAPP_PAYMENTS_ENABLED === "true"
+      ? "WhatsApp worker started (confirmed testnet payments enabled)."
+      : "WhatsApp worker started (payment review enabled; sending disabled).",
+  );
   try {
     do {
       store.prepare();
@@ -30,6 +35,18 @@ async function main() {
           if (payload._steward_type === "balance") {
             payload = { to: payload.to, ...(await balanceReply(store.db, config.key, payload.to)) };
             // Persist the resolved reply before delivery so stored output remains reviewable.
+            store.db
+              .prepare("UPDATE wa_outbox SET payload=? WHERE id=? AND state='sending'")
+              .run(seal(payload, config.key), job.id);
+          }
+          if (
+            payload._steward_type === "payment_review" &&
+            typeof payload.payment_id === "string"
+          ) {
+            payload = {
+              to: payload.to,
+              ...(await reviewPayment(store.db, config.key, payload.to, payload.payment_id)),
+            };
             store.db
               .prepare("UPDATE wa_outbox SET payload=? WHERE id=? AND state='sending'")
               .run(seal(payload, config.key), job.id);
@@ -89,6 +106,7 @@ async function main() {
         }
       }
       await provisionWallet(store.db, config.allowed, config.key);
+      await processPayment(store.db, config.key, config.allowed);
       if (process.argv.includes("--once")) break;
       await sleep(job ? 100 : 1000);
     } while (running);
