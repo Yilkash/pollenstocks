@@ -48,6 +48,7 @@ export function migratePayments(db: DatabaseSync) {
  gas TEXT,gas_price TEXT,nonce INTEGER,confirmation_hash TEXT,recipient TEXT NOT NULL,reply_until INTEGER NOT NULL,
  idempotency_key TEXT NOT NULL UNIQUE,reference_id TEXT NOT NULL UNIQUE,tx_hash TEXT,
  lease TEXT,lease_until INTEGER,next_check INTEGER NOT NULL DEFAULT 0,error TEXT);
+ CREATE TABLE IF NOT EXISTS wa_payment_typing(payment_id TEXT PRIMARY KEY,message_id TEXT NOT NULL);
  CREATE UNIQUE INDEX IF NOT EXISTS wa_payment_one_active ON wa_payments(account_id)
  WHERE state IN ('quoting','review','queued','preflight','submitting','unknown','broadcast');`);
 }
@@ -63,8 +64,8 @@ export function paymentReply(
   key: Buffer,
   message: { from: string; input: string; id: string; timestamp?: number },
 ) {
-  const command = message.input.trim(),
-    lower = command.toLowerCase().replace(/^\//, "");
+  let command = message.input.trim();
+  const lower = command.toLowerCase().replace(/^\//, "");
   let action = actionFor(lower);
   const sender = senderLookup(message.from, key);
   const wallet = db
@@ -88,6 +89,14 @@ export function paymentReply(
   const session = db
     .prepare("SELECT stage,destination,expires FROM wa_payment_sessions WHERE account_id=?")
     .get(wallet.id) as { stage: string; destination: string | null; expires: number } | undefined;
+  if (session?.stage === "amount") {
+    const amountInput =
+      /^(?:amount\s+)?\$?((?:[0-9]+(?:\.[0-9]{1,6})?|\.[0-9]{1,6}))(?:\s*(?:demo\s*usd|dusd|usd))?$/i.exec(
+        command,
+      );
+    if (amountInput)
+      command = amountInput[1].startsWith(".") ? "0" + amountInput[1] : amountInput[1];
+  }
   // During amount entry, numbers are amounts rather than numbered menu commands.
   if (session && /^\d+(?:\.\d+)?$/.test(command)) action = undefined;
   const now = Date.now();
@@ -139,6 +148,10 @@ export function paymentReply(
     db.prepare(
       "UPDATE wa_payments SET state='queued',confirmed_at=? WHERE id=? AND state='review'",
     ).run(now, p.id);
+    db.prepare("INSERT OR REPLACE INTO wa_payment_typing(payment_id,message_id) VALUES(?,?)").run(
+      p.id,
+      message.id,
+    );
     return { _steward_type: "typing", message_id: message.id };
   }
   if (action === "history" || lower === "activity") {

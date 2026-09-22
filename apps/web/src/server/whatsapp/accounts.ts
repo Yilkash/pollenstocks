@@ -1,3 +1,4 @@
+import { migratePaymentLanguage, paymentLanguageReply } from "./payment-language";
 import { migrateAssistant, assistantRoute } from "./assistant";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
@@ -37,6 +38,7 @@ export function migrateAccounts(db: DatabaseSync) {
   migrateContacts(db);
   migratePhoneRecipients(db);
   migrateAssistant(db);
+  migratePaymentLanguage(db);
 }
 // Invoked inside the inbox/outbox transaction; account creation, consuming consent and
 // enqueueing its reply succeed together. No provider/network work belongs in this function.
@@ -83,6 +85,8 @@ export function accountReply(
   }
   const contact = account && contactsReply(db, key, account.id, message.input);
   if (contact) return contact;
+  const naturalPayment = account && paymentLanguageReply(db, key, account.id, message);
+  if (naturalPayment) return naturalPayment;
   const payment = paymentReply(db, key, message);
   if (payment) return payment;
   if (message.input.startsWith("walletsetup:")) {

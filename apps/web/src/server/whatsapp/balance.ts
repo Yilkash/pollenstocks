@@ -5,7 +5,7 @@ import { text } from "./menu";
 
 // Read-only client: no signer, authorization key, transfer or funding capability.
 const client = createPublicClient({
-  transport: http("https://rpc.testnet.chain.robinhood.com", { timeout: 8000, retryCount: 0 }),
+  transport: http("https://rpc.testnet.chain.robinhood.com", { timeout: 8000, retryCount: 1 }),
 });
 const token = "0x13800afeea6f8688547770052b395099758d9a5b";
 export async function balanceReply(db: DatabaseSync, key: Buffer, phone: string) {
