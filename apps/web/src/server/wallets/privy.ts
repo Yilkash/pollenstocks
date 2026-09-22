@@ -1,8 +1,8 @@
 import { getAddress, zeroAddress } from "viem";
 import { z } from "zod";
 
-// Preparation-only adapter: the WhatsApp worker does not call this until the
-// provider compatibility/policy gate has been completed. It exposes no signing.
+// Wallet lookup and explicitly gated creation for the WhatsApp provisioner.
+// This adapter exposes no signing or funding methods.
 const walletSchema = z.object({
   id: z.string().min(1),
   address: z.string(),

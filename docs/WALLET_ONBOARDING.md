@@ -122,3 +122,28 @@ creation and database commit, paused accounts and changed configuration. A reque
 recorded as submitted but never received by Privy intentionally stays pending for an
 operator check; it is not automatically recreated. Live balance display, funding and
 payment execution are not implemented by this stage.
+
+## September 22 — wallet setup verification and activation
+
+The user requested continuation through verification and activation. Added and ran
+`apps/web/tests/whatsapp-wallets.test.ts`: **13 tests passed** using temporary SQLite
+files and mocked provider HTTP, with no provider wallets created by the tests.
+Coverage includes old consent not provisioning, sender/expiry/supersession/cancel,
+duplicate acceptance, paused/removed/disabled accounts, changed provider configuration,
+concurrent claims, ambiguous provider submission, database commit failure, provider
+owner mismatch and reopening the database after an interrupted submission. TypeScript
+compilation also passed.
+
+Rechecked the live proof wallet's attached owner/policy and four policy conditions
+against the successful signing proof. Enabled `PRIVY_WALLET_CREATION_ENABLED` in the
+private local environment and restarted only the WhatsApp worker. The callback server
+remained reachable (403 without verification credentials, as expected). Worker schema
+migration succeeded: one existing account, zero setup requests and zero account wallets
+at activation. The proof wallet remains separate.
+
+The tester must send **My account**, then tap **Set up test wallet**. After confirmation,
+opening **My account** again displays the address once provisioning completes. No
+confirmation was generated or accepted on the user's behalf. Live consent-to-wallet
+creation is awaiting that interaction. Funding, balances and payments remain separate
+follow-up work. Unknown creation outcomes continue to use lookup only; operator review
+may be needed when a submitted request never reached the provider.
