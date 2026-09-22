@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
+import { migratePhoneRecipients, phoneSettings } from "./phone-recipients";
 import { migrateContacts, contactsReply } from "./contacts";
 import { migratePayments, paymentReply } from "./payments";
 import { senderLookup } from "./config";
@@ -33,6 +34,7 @@ export function migrateAccounts(db: DatabaseSync) {
   migrateWalletSetup(db);
   migratePayments(db);
   migrateContacts(db);
+  migratePhoneRecipients(db);
 }
 // Invoked inside the inbox/outbox transaction; account creation, consuming consent and
 // enqueueing its reply succeed together. No provider/network work belongs in this function.
@@ -50,6 +52,23 @@ export function accountReply(
     return text(
       "This account is paused. Contact the Steward operator for recovery. No wallet action was performed.",
     );
+  const paymentEntry =
+    account &&
+    db.prepare("SELECT account_id FROM wa_payment_sessions WHERE account_id=?").get(account.id);
+  if (
+    message.input.startsWith("phoneprivacy:") ||
+    ["settings", "help"].includes(command) ||
+    (actionFor(command) === "help" && !(paymentEntry && /^\d+$/.test(command)))
+  ) {
+    if (account) {
+      db.prepare("DELETE FROM wa_contact_sessions WHERE account_id=?").run(account.id);
+      db.prepare("DELETE FROM wa_payment_sessions WHERE account_id=?").run(account.id);
+      db.prepare("DELETE FROM wa_payment_recipient_labels WHERE account_id=?").run(account.id);
+    }
+    return account
+      ? phoneSettings(db, account.id, message.input, message.id)
+      : text("Create your Steward account first to use phone-number settings. Type Menu to begin.");
+  }
   const contact = account && contactsReply(db, key, account.id, message.input);
   if (contact) return contact;
   const payment = paymentReply(db, key, message);

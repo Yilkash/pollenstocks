@@ -50,7 +50,7 @@ export function reply(input: string) {
     );
   if (action === "help" || command === "help")
     return text(
-      "Steward is a testnet payment prototype. Create your account and wallet, view your balance, or send Demo USD to a wallet address after reviewing and confirming in WhatsApp. Manage contacts to save names and wallet addresses. Phone-number recipients are coming later. Limits: 1,000 Demo USD per payment and 5,000 per rolling 24 hours. Never share a seed phrase or private key. Type Menu to return.",
+      "Steward is a testnet payment prototype. Create your account and wallet, view your balance, or send Demo USD to a wallet address after reviewing and confirming in WhatsApp. Manage contacts to save names and wallet addresses. Recipients can enable phone-number payments in Help & settings. Limits: 1,000 Demo USD per payment and 5,000 per rolling 24 hours. Never share a seed phrase or private key. Type Menu to return.",
     );
   if (action === "chat")
     return text(

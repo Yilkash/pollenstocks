@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { getAddress, zeroAddress, formatUnits, parseUnits } from "viem";
 import { seal, senderLookup } from "./config";
+import { normalizePhone, resolvePhoneRecipient } from "./phone-recipients";
 import { contactList, contactById, contactByName } from "./contacts";
 import { actionFor, text } from "./menu";
 
@@ -184,7 +185,7 @@ export function paymentReply(
       interactive: {
         type: "button",
         body: {
-          text: "Where should I send Demo USD? Choose a saved contact, enter their name, or paste a Robinhood testnet wallet address. Type Cancel to stop.",
+          text: "Where should I send Demo USD? Choose a saved contact, enter their name or full international WhatsApp number, or paste a Robinhood testnet wallet address. Type Cancel to stop.",
         },
         action: {
           buttons: [
@@ -221,9 +222,21 @@ export function paymentReply(
   }
   if (session.stage === "address") {
     try {
-      const contact = command.startsWith("paycontact:pick:")
-        ? contactById(db, key, wallet.id, command.split(":")[2])
-        : contactByName(db, key, wallet.id, command);
+      const phone = normalizePhone(command);
+      const phoneResult = phone ? resolvePhoneRecipient(db, key, wallet.id, phone) : null;
+      if (phoneResult && "limited" in phoneResult)
+        return text(
+          "You have reached the phone lookup limit. Try again in an hour, or use a saved contact or wallet address.",
+        );
+      if (phone && !phoneResult)
+        return text(
+          "This number is not available for phone-number payments. Ask the recipient to enable lookup in Help & settings, or use their wallet address.",
+        );
+      const contact =
+        phoneResult ??
+        (command.startsWith("paycontact:pick:")
+          ? contactById(db, key, wallet.id, command.split(":")[2])
+          : contactByName(db, key, wallet.id, command));
       const address = getAddress(contact?.address ?? command);
       if (
         address === zeroAddress ||
@@ -245,7 +258,7 @@ export function paymentReply(
       );
     } catch {
       return text(
-        "Enter a valid 0x wallet address. It must be different from your own address and the Demo USD contract.",
+        "Enter a saved contact name, a full international number (including country code), or a valid 0x wallet address. The recipient must be different from your own wallet and the Demo USD contract.",
       );
     }
   }

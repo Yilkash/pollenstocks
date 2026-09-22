@@ -239,3 +239,24 @@ address. Raw address transfers retain their existing flow and confirmation requi
 TypeScript compilation passed and the worker restarted. No automated tests were added
 or run for this milestone. Live add/edit/delete and contact payment checks remain for
 the user's next WhatsApp interaction; no contacts or payments were created on their behalf.
+
+## September 22 — opt-in phone-number recipients
+
+Help & settings now offers phone-number lookup on/off with a separate versioned,
+single-use, account-bound confirmation expiring after ten minutes. The existing
+phone_lookup default remains off; no user was opted in automatically. Settings explain
+that enabling reveals the wallet address to Steward users who know the full number,
+without revealing balance/history or granting spending authority. Disabling affects
+new lookups, not previously captured addresses or reviewed payments.
+
+Recipient entry accepts international numbers with country code, optional plus and
+formatting spaces/hyphens/parentheses. Resolution uses the existing keyed sender lookup
+and requires an active account, explicit visibility opt-in and a chain-46630 wallet.
+Missing, private and inactive recipients receive the same unavailable response. Lookups
+are limited to 20 per account per hour. The resolved number label is encrypted and frozen
+with the payment address; review shows both before confirmation. No public directory or
+reverse lookup was added. Opening settings clears unfinished contact/payment entry.
+
+TypeScript compilation passed and the WhatsApp worker restarted. No automated tests
+were added/run, no privacy setting was changed on a user's behalf, and no payment was
+sent for this milestone. Live opt-in and cross-account recipient checks remain pending.
