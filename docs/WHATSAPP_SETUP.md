@@ -15,6 +15,10 @@ Status: implemented locally; TypeScript compilation passed. No automated or live
 
 Use the WhatsApp section in `apps/web/.env.example` as the template for your ignored `.env.local`. Do not replace existing SERV or web settings.
 
+From `apps/web`, run `npm run whatsapp:setup -- --init` to add missing fields and generate the private verification token and encryption key. Existing nonempty values are preserved. This leaves a new configuration disabled, prints no secrets and sends no messages. Run it after saving/closing edits to the env file. It refuses to generate a new encryption key if a WhatsApp database already exists without its key.
+
+Then fill in your Meta credentials and tester sender IDs locally. `npm run whatsapp:setup` reports only missing/present/invalid status; it does not authenticate credentials or send requests. Set `WHATSAPP_ENABLED=true` only when ready.
+
 Set:
 
 - `WHATSAPP_ENABLED=true` only when ready to receive events.
