@@ -1,49 +1,52 @@
-# Ask Steward: data boundary and payment requests
+# Ask Steward: AI intent routing and task memory
 
-Status: current-message-only integration authorized by the user and implemented.
-The earlier history-sharing proposal was rejected by automatic approval review and
-was not executed. The user approved this narrower design before implementation.
+## Approved data boundary
 
-## Data boundary
+The user explicitly approved the current message, up to four recent chat exchanges,
+and user-provided current task details being sent to OpenServ at
+`https://inference-api.openserv.ai/v1/chat/completions`. Automatic approval review
+initially blocked this expansion until that specific authorization was obtained.
 
-- Selecting Ask Steward presents an opt-in disclosure before any external request.
-- The only user data sent to `https://inference-api.openserv.ai/v1/chat/completions`
-  is the current message deliberately entered in Ask Steward. It may contain a contact
-  name, phone number, wallet address or amount supplied by that user.
-- The request also contains fixed assistant instructions and tool schemas. Service API
-  authentication is sent only as the required request header to that provider.
-- No conversation history, contact list, live balances, stored payment records, WhatsApp
-  sender identifier, wallet credentials or private keys are included in inference input.
-- SERV selects one of: answer a general question, request a balance, request recent
-  payment status, or propose recipient/amount fields for a Demo USD review.
-- Balance/status retrieval and recipient resolution run locally after parsing. Results
-  return directly to WhatsApp, without another inference request.
-- Payment proposals must use recipient and amount explicitly present in the current
-  message. USD shorthand or omitted currency means Demo USD in this testnet app;
-  the payment review explicitly labels the asset. Other currencies remain unsupported.
-- Payment proposals reuse the deterministic manual flow and confirmation buttons.
-  No signing, submission, contact mutation or privacy-setting tool is exposed to SERV.
-- Chat has per-account request limits and bounded request size/time. Menu exits chat.
-- Choosing local commands instead leaves all existing menu features operational.
+Every WhatsApp user must accept the new `serv-task-memory-v2` disclosure. An old
+current-message-only session does not authorize the new payload. Requests are bound
+to the exact consent session; queued requests from a closed session are rejected.
 
-## Implementation status
+- History is encrypted locally and limited to four exchanges, with a one-hour expiry.
+- Unfinished task fields expire after ten minutes. Menu exits and clears chat memory.
+- Expired memory is purged by the worker. These limits apply to assistant memory;
+  the existing encrypted inbox/outbox records have their separate lifecycle.
+- Fixed instructions and tool schemas accompany the opted-in context.
+- Stored balances, contact lists, payment records, sender identifiers and wallet keys
+  are excluded. Tool results go directly to WhatsApp, not back to inference.
+- History stores user messages and model explanations or generic tool markers,
+  never the returned balance/contact/receipt data. Users may themselves type such data.
 
-Account-bound, expiring opt-in, local tool routing, request limits and durable payment
-review are implemented. No tool can sign or send a payment. Only the existing payment
-confirmation flow can authorize submission.
+## Intent tools
 
-TypeScript compilation passed and the WhatsApp worker was restarted on 2026-09-22.
-The user confirmed a live Ask Steward payment and receipt before the flexible-input update.
-The latest flexible-input and typing refresh changes have compiled but have not been checked live.
-No sample WhatsApp messages are submitted to the inference provider during compilation.
+In an opted-in chat, ordinary text reaches SERV before local command rules. Menu and
+confirmation button payloads remain deterministic. Menu shortcuts leave AI chat.
 
-## Local payment language rules
+Tools support balance reads, receiving address/account readiness, recent payment
+status, contact lists/lookups, affordability checks, payment drafts, contact-add
+and contact-delete confirmations, and cancelling unfinished drafts.
 
-Common send/pay/transfer requests are handled locally before inference, including
-amount-first and recipient-first forms. Missing recipients retain the amount for ten
-minutes; missing amounts use the existing payment-entry session. No draft history is
-sent to SERV. All paths reuse the existing review and single-use confirmation flow.
+The model proposes tool arguments. Runtime validation checks argument shapes,
+user-provided values, account scope and task state. Missing payment/contact fields
+are collected across messages. Demo USD is the only supported payment asset;
+USD shorthand is explicitly presented as Demo USD in review.
 
-Typing feedback is best effort and independent of payment processing. Confirmed
-payments refresh it for up to three minutes while active; a durable delayed-payment
-notice remains the fallback. A Meta/network failure can prevent the dots appearing.
+Payment tools reuse existing limits, recipient resolution, fee checks and durable
+review. There is no AI signing, submission or confirmation tool. Contact tools also
+prepare confirmation buttons rather than applying changes directly. Affordability
+uses actual balances and a conservative fee reserve, with exact fee and spending
+checks deferred to payment review.
+
+## Verification
+
+TypeScript compilation passed. The broader intent and memory flow still requires a
+live user check. No automated tests or synthetic inference requests were run.
+Existing live payment/receipt flow was previously confirmed by the user.
+
+Typing feedback refreshes while replies are prepared and while confirmed payments
+remain active (bounded to three minutes). Meta/network failures can still prevent
+those indicators being displayed; delayed payment notices remain the fallback.

@@ -1,5 +1,13 @@
 import type { DatabaseSync } from "node:sqlite";
-import { createPublicClient, erc20Abi, formatEther, formatUnits, getAddress, http } from "viem";
+import {
+  createPublicClient,
+  erc20Abi,
+  formatEther,
+  formatUnits,
+  getAddress,
+  http,
+  parseUnits,
+} from "viem";
 import { senderLookup } from "./config";
 import { text } from "./menu";
 
@@ -8,7 +16,7 @@ const client = createPublicClient({
   transport: http("https://rpc.testnet.chain.robinhood.com", { timeout: 8000, retryCount: 1 }),
 });
 const token = "0x13800afeea6f8688547770052b395099758d9a5b";
-export async function balanceReply(db: DatabaseSync, key: Buffer, phone: string) {
+export async function balanceReply(db: DatabaseSync, key: Buffer, phone: string, amount?: string) {
   const sender = senderLookup(phone, key);
   const wallet = db
     .prepare(
@@ -50,6 +58,15 @@ export async function balanceReply(db: DatabaseSync, key: Buffer, phone: string)
       | undefined;
     if (current?.status !== "active")
       return text("This account is paused. Contact the Steward operator for recovery.");
+    if (amount !== undefined) {
+      if (!/^(?:0|[1-9]\d{0,3})(?:\.\d{1,6})?$/.test(amount) || parseUnits(amount, 6) <= 0n)
+        return text("Enter a positive Demo USD amount to check.");
+      const enough = demoUsd >= parseUnits(amount, 6);
+      const reserve = 100000000000000n;
+      return text(
+        `For ${amount} Demo USD:\n\n${enough ? "Your Demo USD balance covers the amount." : "Your Demo USD balance is too low."}\n${testEth >= reserve ? "Your test ETH covers the conservative 0.0001 test ETH fee reserve." : "Your test ETH is below the conservative 0.0001 test ETH fee reserve; an exact payment review is needed."}\n\nBalance: ${formatUnits(demoUsd, decimals)} Demo USD\nNetwork fees: ${formatEther(testEth)} test ETH\n\nThis is a balance check, not a payment approval. The exact fee, pending payments and spending limits are checked during payment review. Nothing was prepared or sent.`,
+      );
+    }
     return text(
       `Your Steward balance\n\nDemo USD: ${formatUnits(demoUsd, decimals)}\nTest ETH (network fees): ${formatEther(testEth)}\n\nNetwork: Robinhood Chain testnet\nChecked at ${new Date(Number(block.timestamp) * 1000).toISOString().replace("T", " ").replace(".000Z", " UTC")}\n\n${demoUsd === 0n && testEth === 0n ? "Your wallet currently has no Demo USD or test ETH. Choose Receive payment to see its address.\n\n" : ""}Test assets have no monetary value. Type Balance to refresh or Menu to return.`,
     );

@@ -1,6 +1,6 @@
 import { setDefaultAutoSelectFamilyAttemptTimeout } from "node:net";
 import { setDefaultResultOrder } from "node:dns";
-import { assistantReply } from "../src/server/whatsapp/assistant";
+import { assistantReply, purgeAssistantMemory } from "../src/server/whatsapp/assistant";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
   deliveryConfig,
@@ -111,6 +111,7 @@ async function main() {
   );
   try {
     do {
+      purgeAssistantMemory(store.db);
       store.prepare();
       refreshPaymentTyping();
       const job = store.claim();

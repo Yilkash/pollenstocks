@@ -1,5 +1,5 @@
 import { migratePaymentLanguage, paymentLanguageReply } from "./payment-language";
-import { migrateAssistant, assistantRoute } from "./assistant";
+import { migrateAssistant, assistantRoute, assistantSession } from "./assistant";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { migratePhoneRecipients, phoneSettings } from "./phone-recipients";
@@ -56,6 +56,7 @@ export function accountReply(
     return text(
       "This account is paused. Contact the Steward operator for recovery. No wallet action was performed.",
     );
+  const inChat = account && assistantSession(db, account.id);
   const paymentEntry =
     account &&
     db.prepare("SELECT account_id FROM wa_payment_sessions WHERE account_id=?").get(account.id);
@@ -63,7 +64,7 @@ export function accountReply(
     assistantRoute(db, account.id, message.input, message.id);
   if (
     message.input.startsWith("servchat:") ||
-    (actionFor(command) === "chat" && !(paymentEntry && /^\d+$/.test(command)))
+    (actionFor(command) === "chat" && !((paymentEntry || inChat) && /^\d+$/.test(command)))
   ) {
     return account
       ? assistantRoute(db, account.id, message.input, message.id)
@@ -72,9 +73,10 @@ export function accountReply(
   if (
     message.input.startsWith("phoneprivacy:") ||
     ["settings", "help"].includes(command) ||
-    (actionFor(command) === "help" && !(paymentEntry && /^\d+$/.test(command)))
+    (actionFor(command) === "help" && !((paymentEntry || inChat) && /^\d+$/.test(command)))
   ) {
     if (account) {
+      assistantRoute(db, account.id, "Menu", message.id);
       db.prepare("DELETE FROM wa_contact_sessions WHERE account_id=?").run(account.id);
       db.prepare("DELETE FROM wa_payment_sessions WHERE account_id=?").run(account.id);
       db.prepare("DELETE FROM wa_payment_recipient_labels WHERE account_id=?").run(account.id);
@@ -82,6 +84,25 @@ export function accountReply(
     return account
       ? phoneSettings(db, account.id, message.input, message.id)
       : text("Create your Steward account first to use phone-number settings. Type Menu to begin.");
+  }
+  // Ordinary chat language reaches intent inference first. Button payloads keep
+  // their deterministic handlers and cannot authorize actions through the model.
+  if (
+    account &&
+    ((command.startsWith("menu:") && command !== "menu:chat") ||
+      /^contact:(?:add|edit|pick|page)(?::|$)/.test(command))
+  )
+    assistantRoute(db, account.id, "Menu", message.id);
+  if (
+    account &&
+    assistantSession(db, account.id) &&
+    !/^(?:menu|pay|contact|paycontact|phoneprivacy|walletsetup|enroll|servchat):/.test(
+      message.input,
+    ) &&
+    !["menu", "cancel", "hi", "hello", "start"].includes(command)
+  ) {
+    const intent = assistantRoute(db, account.id, message.input, message.id);
+    if (intent) return intent;
   }
   const contact = account && contactsReply(db, key, account.id, message.input);
   if (contact) return contact;
@@ -178,5 +199,6 @@ export function accountReply(
   }
   const chat = account && assistantRoute(db, account.id, message.input, message.id);
   if (chat) return chat;
+  if (account && !action) return assistantRoute(db, account.id, "Ask Steward", message.id);
   return action || command === "help" ? null : menu(!!account);
 }
