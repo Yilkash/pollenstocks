@@ -95,3 +95,30 @@ recovery remain implementation work.
 Reference: [Privy server request authorization](https://docs.privy.io/controls/authorization-keys/using-owners/sign/direct-implementation)
 and the installed SDK types/source. The official SDK handles authorization signatures;
 Steward has not exported the proof wallet's private key.
+
+
+## September 22 — staged WhatsApp provisioning implementation
+
+Added durable `wa_wallet_provisioning` and `wa_managed_wallets` records, plus a separate
+versioned wallet-setup consent. The existing account consent is not reused to create
+wallets: it explicitly said creation was deferred. With the creation flag enabled,
+My account offers **Set up test wallet / Cancel**. Consent is bound to the sender and
+account, expires after ten minutes, is single-use and is superseded by a newer offer.
+Its acceptance freezes app, owner and policy IDs alongside the durable request.
+
+The WhatsApp worker can claim one eligible active, allowlisted account using a lease,
+look up its stable external ID, and create only when no prior submission is recorded.
+A possibly submitted request is subsequently reconciled by lookup only. Configuration
+mismatches block the job. Provider metadata is validated before the wallet and ready
+state commit together. No provider call happens inside a SQLite transaction. Ready
+accounts show the address through My account and Receive payment. `/menu` and fallback
+menus now preserve the existing account label.
+
+The environment flag remains **false**, and running processes have not been restarted
+for these changes. No WhatsApp wallet was created by this implementation. TypeScript
+compilation passed; no new automated tests were added or run. Before enabling, verify
+consent expiry/replay/wrong sender, duplicate worker claims, interruption around provider
+creation and database commit, paused accounts and changed configuration. A request
+recorded as submitted but never received by Privy intentionally stays pending for an
+operator check; it is not automatically recreated. Live balance display, funding and
+payment execution are not implemented by this stage.

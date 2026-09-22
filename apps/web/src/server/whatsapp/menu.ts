@@ -33,7 +33,7 @@ export function menu(hasAccount = false) {
   };
 }
 export function actionFor(input: string) {
-  const command = input.trim().toLowerCase();
+  const command = input.trim().toLowerCase().replace(/^\//, "");
   const action = actions.find(
     ([id, label], index) =>
       command === "menu:" + id || command === label.toLowerCase() || command === String(index + 1),
@@ -41,7 +41,7 @@ export function actionFor(input: string) {
   return action;
 }
 export function reply(input: string) {
-  const command = input.trim().toLowerCase();
+  const command = input.trim().toLowerCase().replace(/^\//, "");
   const action = actionFor(input);
   if (action === "create")
     return text(

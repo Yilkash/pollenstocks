@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { deliveryConfig, unseal, whatsappConfig } from "../src/server/whatsapp/config";
+import { provisionWallet } from "../src/server/whatsapp/provision-wallet";
 import { WhatsAppStore } from "../src/server/whatsapp/store";
 
 async function main() {
@@ -13,7 +14,7 @@ async function main() {
   process.on("SIGTERM", () => {
     running = false;
   });
-  console.log("WhatsApp transport worker started (wallet execution unavailable).");
+  console.log("WhatsApp transport worker started (payment execution unavailable).");
   try {
     do {
       store.prepare();
@@ -70,6 +71,7 @@ async function main() {
           store.finish(job.id, "unknown", null, "delivery_uncertain");
         }
       }
+      await provisionWallet(store.db, config.allowed, config.key);
       if (process.argv.includes("--once")) break;
       await sleep(job ? 100 : 1000);
     } while (running);

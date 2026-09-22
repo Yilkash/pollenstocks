@@ -2,6 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { senderLookup } from "./config";
 import { actionFor, menu, text } from "./menu";
+import { migrateWalletSetup, walletSetupReply, walletAddress, readyAccount } from "./wallet-setup";
 
 // Version the exact disclosure so later custody changes require fresh consent.
 export const CONSENT_VERSION = "steward-test-account-v1";
@@ -27,6 +28,7 @@ export function migrateAccounts(db: DatabaseSync) {
       state TEXT NOT NULL DEFAULT 'awaiting_provider', created INTEGER NOT NULL
     );
   `);
+  migrateWalletSetup(db);
 }
 // Invoked inside the inbox/outbox transaction; account creation, consuming consent and
 // enqueueing its reply succeed together. No provider/network work belongs in this function.
@@ -36,6 +38,7 @@ export function accountReply(
   message: { from: string; input: string; id: string },
 ) {
   const sender = senderLookup(message.from, key);
+  const command = message.input.trim().toLowerCase().replace(/^\//, "");
   const account = db
     .prepare("SELECT id,status,wallet_state FROM wa_accounts WHERE sender=?")
     .get(sender) as Account | undefined;
@@ -43,6 +46,11 @@ export function accountReply(
     return text(
       "This account is paused. Contact the Steward operator for recovery. No wallet action was performed.",
     );
+  if (message.input.startsWith("walletsetup:")) {
+    return account
+      ? walletSetupReply(db, sender, account.id, message.input, message.id)
+      : text("Create a Steward test account first. Type Menu to begin.");
+  }
   if (message.input.startsWith("enroll:")) {
     const match = /^enroll:(accept|cancel):([a-f0-9]{48})$/.exec(message.input);
     if (!match)
@@ -78,15 +86,12 @@ export function accountReply(
       "Your Steward test account is created. Wallet setup is pending; no wallet address or test funds are available yet. Type Menu to return, or choose My account to check setup status.",
     );
   }
-  const action = actionFor(message.input);
+  const action = actionFor(command);
   if (
     action === "create" ||
-    ["my account", "menu:account"].includes(message.input.trim().toLowerCase())
+    ["my account", "menu:account", "account", "can i see the account"].includes(command)
   ) {
-    if (account)
-      return text(
-        "Your Steward test account is active. Wallet setup is pending. No wallet has been created or funded yet. Phone-number recipient lookup is off. Type Menu to return.",
-      );
+    if (account) return walletSetupReply(db, sender, account.id, message.input, message.id);
     // Invalidate older offers so only the newest account consent can be used.
     db.prepare(
       "UPDATE wa_account_consents SET consumed=?,outcome='superseded' WHERE sender=? AND consumed IS NULL",
@@ -112,14 +117,20 @@ export function accountReply(
       },
     };
   }
-  if (["hi", "hello", "menu", "start"].includes(message.input.trim().toLowerCase()))
-    return menu(!!account);
+  if (["hi", "hello", "menu", "start"].includes(command)) return menu(!!account);
   if (action && ["balance", "send", "receive", "history", "contacts"].includes(action)) {
+    const wallet = account && walletAddress(db, account.id);
+    if (wallet)
+      return action === "receive"
+        ? readyAccount(wallet.address)
+        : text(
+            "Your test wallet is ready. This feature is still being connected; no payment was prepared or sent. Choose My account or Receive payment to see your address. Type Menu to return.",
+          );
     return text(
       account
         ? "Your test account is ready, but wallet setup is pending. This action is not available yet; no payment was prepared or sent. Type Menu to return."
         : "Create your Steward test account first: type Create account to review the details. Wallet setup is still pending.",
     );
   }
-  return null;
+  return action || command === "help" ? null : menu(!!account);
 }
