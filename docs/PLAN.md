@@ -135,3 +135,7 @@ Implemented: wallet sign-in, balance reads, contact storage, receive QR, manual 
 ## Folder organization checkpoint
 
 Web app: `../apps/web`. Contracts: `../contracts`. Current documents: this directory. Historical portfolio plan: `archive/PORTFOLIO_PLAN.md`. The UI now uses focused components and a shared state hook; server handlers are split by feature. Web and contract builds pass after the move. See `../CHANGELOG.md` for the milestone and `../CONTRIBUTING.md` for formatting and commit conventions.
+
+## Live verification checkpoint — September 22
+
+The user deployed the test token, claimed faucet tokens and sent 5 DUSD to a second wallet. Read-only verification matched the transaction and Transfer event and confirmed balances of 995 and 5 DUSD at inclusion. The local SERV key also authenticated successfully: a balance question triggered get_balances and produced an answer using live chain data. See the changelog for transaction and block references. Earlier pending-deployment and pending-authentication notes describe previous checkpoints. The full browser chat-to-payment demonstration, recovery testing and hackathon eligibility clarification remain open.
