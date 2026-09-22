@@ -211,3 +211,12 @@ milestone, and no payment was submitted on the user's behalf. End-to-end payment
 is awaiting the user's first reviewed and confirmed payment. Saved-name/phone recipients,
 transaction replacement and automatic retry of definitively rejected submissions are not
 included. This remains a testnet prototype.
+
+## September 22 — payment waiting feedback
+
+The user confirmed a successful live 5 Demo USD payment with its WhatsApp receipt.
+At their request, accepted payment confirmations now return a native typing indicator
+instead of the immediate acknowledgement text. The final receipt is unchanged. A
+checking message is only queued if reconciliation remains unresolved for at least
+30 seconds; failures still receive an explicit response. TypeScript compilation passed;
+the worker was restarted. No payment was submitted to exercise this visual change.

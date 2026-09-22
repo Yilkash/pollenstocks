@@ -419,7 +419,9 @@ export async function processPayment(db: DatabaseSync, key: Buffer, allowed: Set
       update(
         p.tx_hash ? "broadcast" : "unknown",
         "awaiting_reconciliation",
-        "Your payment status is being checked. Please don’t send it again. I’ll send a receipt here when it is confirmed.",
+        Date.now() - (p.confirmed_at ?? p.created) >= 30000
+          ? "Your payment is taking longer than expected. Please don’t send it again. I’ll send the receipt here when it is confirmed."
+          : undefined,
         "checking",
       );
     else

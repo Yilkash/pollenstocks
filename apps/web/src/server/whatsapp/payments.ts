@@ -137,9 +137,7 @@ export function paymentReply(
     db.prepare(
       "UPDATE wa_payments SET state='queued',confirmed_at=? WHERE id=? AND state='review'",
     ).run(now, p.id);
-    return text(
-      "Payment confirmed. I’ll send the receipt here when the network confirms it. Please don’t submit it again.",
-    );
+    return { _steward_type: "typing", message_id: message.id };
   }
   if (action === "history" || lower === "activity") {
     const rows = db
