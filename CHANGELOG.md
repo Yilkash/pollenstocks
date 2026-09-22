@@ -32,3 +32,9 @@ Compilation checkpoint: `npm run build` passes (including TypeScript); `forge bu
 - Added a testnet deployment page with wallet connection, estimated fees and explicit wallet approval.
 - Added a reproducible token bytecode export and receipt/code verification.
 - Added recovery for a submitted deployment hash. No deployment has been broadcast by the assistant.
+
+## 2026-09-22 — Testnet token configured
+
+- User deployed Demo USD at `0x13800afeea6f8688547770052b395099758d9a5b` on chain 46630.
+- Read-only RPC checks confirmed the runtime bytecode, name, symbol and six decimals.
+- Configured the local web app with the verified token address. Faucet claim, end-to-end transfer and authenticated SERV call remain pending.

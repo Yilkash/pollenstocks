@@ -1,0 +1,9 @@
+{
+  "chainId": 46630,
+  "address": "0x13800afeea6f8688547770052b395099758d9a5b",
+  "name": "Demo USD",
+  "symbol": "DUSD",
+  "decimals": 6,
+  "verifiedAt": "2026-09-22",
+  "verification": "Deployed runtime bytecode matches apps/web/src/generated/payment-token.json; metadata read from testnet RPC."
+}

@@ -2,7 +2,7 @@
 
 An AI-assisted wallet-to-wallet payment app for Robinhood Chain. SERV prepares payment drafts; the user reviews and signs each transfer in their own wallet.
 
-**Status:** Initial implementation. Web and contract compilation pass after reorganization; see the [changelog](CHANGELOG.md) for the build checkpoint. Live testnet transfers and an authenticated SERV call remain pending. Demo USD is a test token with no monetary value.
+**Status:** Initial implementation. Web and contract compilation pass after reorganization; see the [changelog](CHANGELOG.md) for the build checkpoint. The test token is deployed and its runtime code verified; live wallet-to-wallet transfers and an authenticated SERV call remain pending. Demo USD is a test token with no monetary value.
 
 ## Project layout
 
