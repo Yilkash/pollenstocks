@@ -59,3 +59,39 @@ These references do not prove Robinhood testnet compatibility. No provider walle
 - Automatic WhatsApp wallet creation remains disabled. This proof wallet is not the user's WhatsApp account wallet.
 - Policy enforcement and successful onchain sending are still unproven. The current policy does not permit the token faucet's `claim()` function, so fund the proof wallet with Demo USD transferred from an already funded test wallet. An eventual automated faucet operation needs its own reviewed policy design.
 - No amount/recipient ceiling is encoded in this four-condition policy. Application confirmation and spending controls still need implementation before user payments are enabled.
+
+
+## September 22 — signing and policy proof completed
+
+The dedicated proof wallet was manually funded with 0.001 test ETH and 5 Demo USD.
+Using the official `@privy-io/node` SDK and the saved authorization key, it returned
+**1 Demo USD** to `0xB3144B301819EE517E7594b998b555c0dfdB7ded` on chain 46630.
+
+- Transaction: [0x1b70b8a5ba7c1d0b88aa7bc6ac482937d4e2a0c56c84eba88854faa714190c64](https://explorer.testnet.chain.robinhood.com/tx/0x1b70b8a5ba7c1d0b88aa7bc6ac482937d4e2a0c56c84eba88854faa714190c64).
+- Receipt: success, block **122840299**, transaction nonce **0**, two confirmations observed.
+- Verified chain, sender, token contract, zero native value, exact calldata and one matching ERC-20 Transfer event for 1,000,000 base units.
+- Remaining proof-wallet balance: **4 Demo USD**, **0.00099958399 test ETH**.
+- Privy's transaction lookup returned **confirmed** with the same transaction hash and reference ID.
+- Four separate requests returned HTTP 400, code `policy_violation`: Sepolia chain instead of 46630; proof-wallet address instead of the token contract; `approve(recipient, 0)` instead of `transfer`; and native value 1 wei instead of zero. Probe token amounts were zero.
+- After the probes, pending nonce remained **1** and Demo USD balance remained **4**. The probes were rejected before broadcast.
+
+The standalone `apps/web/scripts/privy-proof.mjs` uses a fixed wallet/recipient/amount,
+checks the attached policy, disables SDK retries and sponsorship, caps the allowed
+transfer's gas budget at 0.0001 test ETH, and persists each request before submission.
+The ignored `.data/privy-transfer-proof.json` retains request IDs, results and receipt.
+Run from `apps/web` with `node --env-file=.env.local scripts/privy-proof.mjs verify`
+for receipt verification. `send` refuses an already recorded attempt. `policy` skips
+recorded explicit policy rejections and stops on any unresolved result.
+Do not delete the journal to retry an uncertain request. A leftover lock after a crash
+requires manual reconciliation before removal.
+
+This proves one managed-wallet transfer and these four restrictions. It does not
+prove timeout recovery, concurrent nonce allocation, idempotent replay after crashes,
+all forbidden RPC methods, or user payment authorization. Automatic WhatsApp wallet
+creation remains disabled, and the existing WhatsApp account still has wallet setup
+pending. Amount limits, recipient confirmation, durable provisioning and payment
+recovery remain implementation work.
+
+Reference: [Privy server request authorization](https://docs.privy.io/controls/authorization-keys/using-owners/sign/direct-implementation)
+and the installed SDK types/source. The official SDK handles authorization signatures;
+Steward has not exported the proof wallet's private key.
