@@ -49,3 +49,13 @@ No tests were added or run for this milestone. Required follow-up cases: wrong-s
 - [Privy external wallet IDs](https://docs.privy.io/wallets/wallets/external-ids): stable per-app identifiers and lookup routes.
 
 These references do not prove Robinhood testnet compatibility. No provider wallet or onchain transaction was created during implementation.
+
+## September 22 — provider setup checkpoint
+
+- Authenticated Privy wallet reads succeeded with the configured app credentials.
+- The saved P-256 authorization key's public key matches the configured one-key owner quorum (threshold 1).
+- Created and read back policy `eeis8w41riooez9phmwfcyt9`, **Steward Robinhood Testnet**. One ALLOW rule for `eth_sendTransaction` requires chain 46630, Demo USD contract `0x13800afeea6f8688547770052b395099758d9a5b`, native value zero and decoded function `transfer`. Address checksum normalization was accounted for in read-back comparison.
+- Created a separate proof wallet: `0xf11aB0Ef7193461D7dBB04Ecd7653f32056d83ca`. Returned owner, policy and external ID were checked. Creation reconciliation metadata is in the ignored `.data/privy-proof-wallet.json`.
+- Automatic WhatsApp wallet creation remains disabled. This proof wallet is not the user's WhatsApp account wallet.
+- Policy enforcement and successful onchain sending are still unproven. The current policy does not permit the token faucet's `claim()` function, so fund the proof wallet with Demo USD transferred from an already funded test wallet. An eventual automated faucet operation needs its own reviewed policy design.
+- No amount/recipient ceiling is encoded in this four-condition policy. Application confirmation and spending controls still need implementation before user payments are enabled.
