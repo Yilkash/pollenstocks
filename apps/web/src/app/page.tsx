@@ -139,6 +139,7 @@ export default function Home() {
             config={config}
             wallet={wallet}
             messages={messages}
+            payments={payments}
             message={message}
             setMessage={setMessage}
             busy={busy}

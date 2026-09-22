@@ -20,6 +20,18 @@ export class Store {
       CREATE UNIQUE INDEX IF NOT EXISTS one_pending_payment ON payments(wallet, chain) WHERE status IN ('signing', 'submitted', 'unknown');
       CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, wallet TEXT NOT NULL, chain INTEGER NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL);
     `);
+    // Additive migration preserves existing conversations and payment history.
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const columns = this.db.prepare("PRAGMA table_info(messages)").all();
+      if (!columns.some((column) => column.name === "payment_id")) {
+        this.db.exec("ALTER TABLE messages ADD COLUMN payment_id TEXT");
+      }
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
   challenge(wallet: string, origin: string, chain: number) {
     const id = randomBytes(24).toString("hex");
@@ -107,7 +119,17 @@ export class Store {
   }
   private hydrate(row: Record<string, unknown>): Payment {
     const p = JSON.parse(row.payload as string) as Payment;
-    return { ...p, status: row.status as PaymentStatus, hash: row.hash as Payment["hash"] };
+    // Resolve only a display label; the stored recipient address remains authoritative.
+    const contact =
+      p.recipientName === "Wallet address"
+        ? this.contacts(p.sender).find((c) => c.address.toLowerCase() === p.recipient.toLowerCase())
+        : undefined;
+    return {
+      ...p,
+      recipientName: contact?.name ?? p.recipientName,
+      status: row.status as PaymentStatus,
+      hash: row.hash as Payment["hash"],
+    };
   }
   payment(wallet: string, id: string): Payment {
     const row = this.db
@@ -193,18 +215,25 @@ export class Store {
     return (
       this.db
         .prepare(
-          "SELECT role,content FROM messages WHERE wallet=? AND chain=? ORDER BY id DESC LIMIT 12",
+          "SELECT role,content,payment_id AS paymentId FROM messages WHERE wallet=? AND chain=? ORDER BY id DESC LIMIT 12",
         )
         .all(wallet.toLowerCase(), chain) as unknown as {
         role: "user" | "assistant";
         content: string;
+        paymentId: string | null;
       }[]
     ).reverse();
   }
-  addMessage(wallet: string, chain: number, role: "user" | "assistant", content: string) {
+  addMessage(
+    wallet: string,
+    chain: number,
+    role: "user" | "assistant",
+    content: string,
+    paymentId: string | null = null,
+  ) {
     this.db
-      .prepare("INSERT INTO messages(wallet,chain,role,content) VALUES(?,?,?,?)")
-      .run(wallet.toLowerCase(), chain, role, content.slice(0, 6000));
+      .prepare("INSERT INTO messages(wallet,chain,role,content,payment_id) VALUES(?,?,?,?,?)")
+      .run(wallet.toLowerCase(), chain, role, content.slice(0, 6000), paymentId);
     this.db
       .prepare(
         "DELETE FROM messages WHERE wallet=? AND chain=? AND id NOT IN (SELECT id FROM messages WHERE wallet=? AND chain=? ORDER BY id DESC LIMIT 40)",

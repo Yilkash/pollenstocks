@@ -56,7 +56,11 @@ export async function balances(wallet: Address) {
 export function recipientFor(wallet: string, input: string) {
   const contact = store()
     .contacts(wallet)
-    .find((c) => c.name.toLowerCase() === input.toLowerCase());
+    .find(
+      (c) =>
+        c.name.toLowerCase() === input.toLowerCase() ||
+        c.address.toLowerCase() === input.toLowerCase(),
+    );
   if (contact) return { recipient: contact.address, recipientName: contact.name };
   if (input.startsWith("0x")) return { recipient: address(input), recipientName: "Wallet address" };
   throw new AppError('No saved contact named "' + input + '". Save the recipient address first.');

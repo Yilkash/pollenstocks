@@ -44,3 +44,10 @@ Compilation checkpoint: `npm run build` passes (including TypeScript); `forge bu
 - Verified a 5 DUSD transfer on testnet in transaction `0x8df33f824e50dccc49d204874205418a3b85a15581dce387756fbecc11f570cd`, block 122765407. Transaction fields and Transfer event matched the app payment; balances at inclusion were 995 DUSD for the sender and 5 for the recipient.
 - Successfully authenticated to SERV with the local key and configured model. SERV requested get_balances and then returned the onchain balance of 995 DUSD and 0.00999217189 test ETH (block 122766949).
 - The running app reports SERV configured. This check exercised the SERV API/tool exchange directly; the full browser chat-to-payment approval flow remains to be demonstrated.
+
+## 2026-09-22 — Payment status in chat
+
+- Linked new assistant drafts to payment IDs in persistent chat records, with an additive SQLite migration.
+- Existing messages containing a draft ID also display current payment status, replacing stale draft instructions after submission.
+- Resolve saved contact names by address for new drafts and previously unnamed payment records; recipient addresses remain unchanged.
+- Production build passes. Browser behavior and recovery scenarios still require verification.

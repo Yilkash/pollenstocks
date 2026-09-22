@@ -4,6 +4,7 @@ export function AssistantChat({
   config,
   wallet,
   messages,
+  payments,
   message,
   setMessage,
   busy,
@@ -11,7 +12,15 @@ export function AssistantChat({
   sendMessage,
 }: Pick<
   PaymentWorkspace,
-  "config" | "wallet" | "messages" | "message" | "setMessage" | "busy" | "run" | "sendMessage"
+  | "config"
+  | "wallet"
+  | "payments"
+  | "messages"
+  | "message"
+  | "setMessage"
+  | "busy"
+  | "run"
+  | "sendMessage"
 >) {
   return (
     <section className="card assistant-card">
@@ -25,12 +34,52 @@ export function AssistantChat({
       <p className="small">Chat and relevant payment details are processed by SERV.</p>
       <div className="conversation" aria-live="polite">
         {messages.length ? (
-          messages.map((m, i) => (
-            <div key={i} className={"bubble " + m.role}>
-              <strong>{m.role === "user" ? "You" : "Steward"}</strong>
-              <p>{m.content}</p>
-            </div>
-          ))
+          messages.map((m, i) => {
+            // Older draft messages contain their ID in text; new ones have a durable link.
+            const payment =
+              m.role === "assistant"
+                ? payments.find((p) =>
+                    m.paymentId ? p.id === m.paymentId : m.content.includes(p.id),
+                  )
+                : undefined;
+            const updated = payment && payment.status !== "draft";
+            const descriptions = {
+              signing: "Waiting for the wallet outcome. Do not submit it again.",
+              submitted: "Submitted. Refresh the receipt to check chain inclusion.",
+              included:
+                "Included on chain. A matching transfer was verified; this is not final settlement.",
+              rejected: "The signing request was stopped or rejected.",
+              failed: "The payment failed verification or reverted. Check the payment details.",
+              unknown: "The outcome is unknown. Recover the transaction before trying again.",
+              expired: "The draft expired. Prepare a new payment if you still want to send it.",
+              draft: "Review the payment and approve it in your wallet.",
+            };
+            return (
+              <div key={i} className={"bubble " + m.role}>
+                <strong>
+                  {m.role === "user" ? "You" : updated ? "Steward · Payment update" : "Steward"}
+                </strong>
+                <p>
+                  {updated
+                    ? payment.amount +
+                      " Demo USD to " +
+                      payment.recipientName +
+                      ". " +
+                      descriptions[payment.status]
+                    : m.content}
+                </p>
+                {payment?.hash && config?.explorer && (
+                  <a
+                    href={config.explorer + "/tx/" + payment.hash}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View transaction ↗
+                  </a>
+                )}
+              </div>
+            );
+          })
         ) : (
           <div className="empty-chat">
             <Sparkles size={27} />

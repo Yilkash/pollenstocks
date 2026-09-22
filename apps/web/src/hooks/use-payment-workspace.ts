@@ -9,7 +9,7 @@ import {
   type Contact,
   type Payment,
 } from "@/lib/shared";
-type Message = { role: string; content: string };
+type Message = { role: string; content: string; paymentId?: string | null };
 /** Owns wallet/session state and payment actions; visual components only render it. */
 export function usePaymentWorkspace() {
   const [config, setConfig] = useState<AppConfig | null>(null),
