@@ -26,3 +26,9 @@
 - Behavioral tests and complete cancellation/replacement recovery.
 
 Compilation checkpoint: `npm run build` passes (including TypeScript); `forge build --skip test` passes from the contracts directory. No tests were run during this reorganization.
+
+## 2026-09-22 — Browser wallet deployment
+
+- Added a testnet deployment page with wallet connection, estimated fees and explicit wallet approval.
+- Added a reproducible token bytecode export and receipt/code verification.
+- Added recovery for a submitted deployment hash. No deployment has been broadcast by the assistant.

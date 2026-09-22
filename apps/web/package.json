@@ -11,7 +11,8 @@
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "export:token": "node scripts/export-token.mjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

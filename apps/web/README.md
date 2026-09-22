@@ -87,3 +87,11 @@ npm run build
 ```
 
 Current build passes, including TypeScript compilation. Automated and live transfer testing remain pending. Testnet-only hackathon eligibility and the authenticated SERV call remain open gates; see [the plan](../../docs/PLAN.md) and [research](../../docs/PAYMENTS_RESEARCH.md).
+
+## Deploy with a browser wallet
+
+Open `/deploy` on the running app. Connect the funded testnet wallet, review the estimated fee, then approve deployment in the wallet. The page is restricted to Robinhood Chain testnet (46630). Check the receipt to obtain the contract address, then configure DEMO_TOKEN_ADDRESS and restart the app.
+
+The page preserves a pending attempt in browser storage before requesting a signature. If the result is uncertain, recover the hash from wallet activity instead of submitting again. Contract creation input, sender, receipt and deployed code are checked before displaying a verified address.
+
+Deployment bytecode is committed in `src/generated/payment-token.json`. After changing the token contract, compile from `../../contracts` with `forge build --skip test`, then run `npm run export:token` and `npm run format` from this directory. Review the generated artifact with the contract change.
