@@ -8,8 +8,8 @@ export const actions = [
   ["chat", "Ask Steward"],
   ["help", "Help & settings"],
 ] as const;
-const text = (body: string) => ({ type: "text", text: { body } });
-export function menu() {
+export const text = (body: string) => ({ type: "text", text: { body } });
+export function menu(hasAccount = false) {
   return {
     type: "interactive",
     interactive: {
@@ -20,25 +20,36 @@ export function menu() {
       action: {
         button: "Open menu",
         sections: [
-          { title: "Steward", rows: actions.map(([id, title]) => ({ id: "menu:" + id, title })) },
+          {
+            title: "Steward",
+            rows: actions.map(([id, title]) => ({
+              id: "menu:" + id,
+              title: id === "create" && hasAccount ? "My account" : title,
+            })),
+          },
         ],
       },
     },
   };
 }
-export function reply(input: string) {
+export function actionFor(input: string) {
   const command = input.trim().toLowerCase();
   const action = actions.find(
     ([id, label], index) =>
       command === "menu:" + id || command === label.toLowerCase() || command === String(index + 1),
   )?.[0];
+  return action;
+}
+export function reply(input: string) {
+  const command = input.trim().toLowerCase();
+  const action = actionFor(input);
   if (action === "create")
     return text(
       "Steward accounts will have a wallet controlled by Steward for testnet payments. Demo USD has no monetary value. Account creation is not available yet; no account or wallet has been created. Type Menu to return.",
     );
   if (action === "help" || command === "help")
     return text(
-      "Steward is a testnet payment prototype. Planned features: send by saved name, registered phone number or wallet address, then review and confirm in WhatsApp. Wallet creation and payments are not available yet. Never share a seed phrase or private key. Type Menu to return.",
+      "Steward is a testnet payment prototype. Planned features: send by saved name, registered phone number or wallet address, then review and confirm in WhatsApp. Choose Create account to review the test-account disclosure. Wallet creation and payments are not available yet. Never share a seed phrase or private key. Type Menu to return.",
     );
   if (action === "chat")
     return text(

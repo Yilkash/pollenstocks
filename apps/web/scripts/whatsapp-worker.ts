@@ -43,11 +43,17 @@ async function main() {
             },
           );
           if (!response.ok) {
+            // Retain numeric Meta diagnostics without persisting raw error messages.
+            const failure = (await response.json().catch(() => null)) as {
+              error?: { code?: unknown };
+            } | null;
+            const metaCode =
+              typeof failure?.error?.code === "number" ? `:meta_${failure.error.code}` : "";
             store.finish(
               job.id,
               response.status >= 500 ? "unknown" : "failed",
               null,
-              `http_${response.status}`,
+              `http_${response.status}${metaCode}`,
             );
           } else {
             const body = (await response.json()) as { messages?: { id?: string }[] };

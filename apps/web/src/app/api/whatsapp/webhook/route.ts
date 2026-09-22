@@ -11,7 +11,10 @@ const messageSchema = z.object({
   type: z.string(),
   text: z.object({ body: z.string().max(4096) }).optional(),
   interactive: z
-    .object({ list_reply: z.object({ id: z.string().max(200) }).optional() })
+    .object({
+      list_reply: z.object({ id: z.string().max(200) }).optional(),
+      button_reply: z.object({ id: z.string().max(200) }).optional(),
+    })
     .optional(),
 });
 const envelope = z.object({
@@ -106,7 +109,12 @@ export async function POST(request: Request) {
           id: m.id,
           from: m.from,
           timestamp,
-          input: m.type === "text" ? m.text?.body || "" : m.interactive?.list_reply?.id || "",
+          input:
+            m.type === "text"
+              ? m.text?.body || ""
+              : m.type === "interactive"
+                ? m.interactive?.list_reply?.id || m.interactive?.button_reply?.id || ""
+                : "",
         });
       }
     }

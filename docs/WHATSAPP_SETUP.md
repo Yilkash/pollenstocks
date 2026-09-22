@@ -1,6 +1,6 @@
 # WhatsApp transport setup
 
-Status: implemented locally; TypeScript compilation passed. No automated or live WhatsApp tests were run for this milestone. Messaging is disabled by default. No provider wallet creation, consent recording, recipient lookup, SERV chat or payment execution is connected to this channel yet.
+Status: the user confirmed the live welcome menu after correcting the tester number, subscribing Steward Pay to the WABA and refreshing the Meta access token. Consent-backed test-account onboarding is now implemented; see [wallet onboarding](WALLET_ONBOARDING.md). Provider wallet creation, recipient lookup, SERV chat and payment execution are not connected yet. New installations default to messaging disabled.
 
 ## What is implemented
 
@@ -9,7 +9,7 @@ Status: implemented locally; TypeScript compilation passed. No automated or live
 - Separate SQLite inbox/outbox at `.data/whatsapp.sqlite`, with AES-256-GCM encrypted message/phone payloads and keyed sender lookup. The encryption key must remain stable; losing it makes queued messages unreadable. Changing it requires an explicit migration.
 - Deduplication by inbound message ID, per-sender intake limit of 20 messages/minute, transactional reply preparation and atomic delivery claims.
 - Interactive menu: Create account, View balance, Send payment, Receive payment, Recent activity, Manage contacts, Ask Steward, Help & settings. Users can type the menu label or its number (1–8). Unknown text returns the menu; free-form SERV routing is not connected yet.
-- Wallet features explicitly report setup pending. Selecting Create account does not record consent or create a wallet.
+- Create account now offers an explicit, expiring custody/testnet consent. Accepting records one test account with wallet setup pending; it does not create a provider wallet. Wallet actions report the pending state.
 
 ## Private configuration
 
@@ -37,7 +37,7 @@ No secret values are needed in chat. No local secrets have been generated or cha
 
 1. Restart the web app after private configuration changes.
 2. Make the app reachable over an HTTPS endpoint. Local development may use an explicitly configured tunnel; hosting and tunnel creation are not performed by these changes.
-3. In Meta's webhook configuration, enter `https://YOUR_HOST/api/whatsapp/webhook` and your verify token. Subscribe to the WhatsApp `messages` field.
+3. In Meta's webhook configuration, enter `https://YOUR_HOST/api/whatsapp/webhook` and your verify token. Subscribe to the WhatsApp `messages` field. Also ensure Steward Pay itself is subscribed to the WABA through `POST /{WABA_ID}/subscribed_apps`; the Meta testing app subscription alone was insufficient in our setup.
 4. From `apps/web`, run `npm run whatsapp:worker`. This loads `.env.local` and starts delivery of queued replies to configured testers. **Starting the worker sends messages**; start it only when ready for the live test.
 5. Send Hi from an allowed tester, open the menu, select Help & settings, then type Menu.
 

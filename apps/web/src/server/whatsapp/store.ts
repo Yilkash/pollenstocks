@@ -3,19 +3,21 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { seal, senderLookup, unseal } from "./config";
 import { reply } from "./menu";
+import { accountReply, migrateAccounts } from "./accounts";
 
 export type Incoming = { id: string; from: string; input: string; timestamp: number };
 export class WhatsAppStore {
   db: DatabaseSync;
   constructor(private key: Buffer) {
     const path = process.env.WHATSAPP_DATABASE_PATH || ".data/whatsapp.sqlite";
-    mkdirSync(dirname(resolve(path)), { recursive: true });
+    mkdirSync(dirname(resolve(/* turbopackIgnore: true */ path)), { recursive: true });
     this.db = new DatabaseSync(path);
     this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS wa_inbox(id TEXT PRIMARY KEY, sender TEXT NOT NULL, received INTEGER NOT NULL, payload TEXT NOT NULL, processed INTEGER NOT NULL DEFAULT 0);
       CREATE INDEX IF NOT EXISTS wa_inbox_sender ON wa_inbox(sender,received);
       CREATE TABLE IF NOT EXISTS wa_outbox(id TEXT PRIMARY KEY, payload TEXT NOT NULL, expires INTEGER NOT NULL, state TEXT NOT NULL DEFAULT 'pending', started INTEGER, provider_id TEXT, error TEXT);
     `);
+    migrateAccounts(this.db);
   }
   accept(messages: Incoming[]) {
     this.db.exec("BEGIN IMMEDIATE");
@@ -53,7 +55,13 @@ export class WhatsAppStore {
           .prepare("INSERT OR IGNORE INTO wa_outbox(id,payload,expires) VALUES(?,?,?)")
           .run(
             row.id,
-            seal({ to: message.from, ...reply(message.input) }, this.key),
+            seal(
+              {
+                to: message.from,
+                ...(accountReply(this.db, this.key, message) ?? reply(message.input)),
+              },
+              this.key,
+            ),
             message.timestamp + 23 * 60 * 60_000,
           );
         this.db.prepare("UPDATE wa_inbox SET processed=1 WHERE id=?").run(row.id);
