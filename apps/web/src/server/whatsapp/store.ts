@@ -91,7 +91,7 @@ export class WhatsAppStore {
       .prepare(
         "UPDATE wa_outbox SET state='unknown',error='delivery_interrupted' WHERE state='sending' AND started<?",
       )
-      .run(Date.now() - 60_000);
+      .run(Date.now() - 180_000);
     this.db
       .prepare("UPDATE wa_outbox SET state='expired' WHERE state='pending' AND expires<=?")
       .run(Date.now());

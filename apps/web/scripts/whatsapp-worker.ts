@@ -1,3 +1,4 @@
+import { assistantReply } from "../src/server/whatsapp/assistant";
 import { setTimeout as sleep } from "node:timers/promises";
 import { deliveryConfig, seal, unseal, whatsappConfig } from "../src/server/whatsapp/config";
 import { processPayment, reviewPayment } from "../src/server/whatsapp/payment-runner";
@@ -31,6 +32,25 @@ async function main() {
           if (!config.allowed.has(payload.to)) {
             store.finish(job.id, "blocked", null, "sender_removed");
             continue;
+          }
+          if (
+            payload._steward_type === "assistant" &&
+            typeof payload.input === "string" &&
+            typeof payload.message_id === "string"
+          ) {
+            payload = {
+              to: payload.to,
+              ...(await assistantReply(
+                store.db,
+                config.key,
+                payload.to,
+                payload.input,
+                payload.message_id,
+              )),
+            };
+            store.db
+              .prepare("UPDATE wa_outbox SET payload=? WHERE id=? AND state='sending'")
+              .run(seal(payload, config.key), job.id);
           }
           if (payload._steward_type === "balance") {
             payload = { to: payload.to, ...(await balanceReply(store.db, config.key, payload.to)) };

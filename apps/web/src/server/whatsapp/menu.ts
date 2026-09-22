@@ -54,7 +54,7 @@ export function reply(input: string) {
     );
   if (action === "chat")
     return text(
-      "SERV chat is not connected to WhatsApp yet. The web assistant remains available. Type Menu to return.",
+      "Create your Steward account first, then choose Ask Steward to review the chat opt-in. Type Menu to return.",
     );
   if (action)
     return text(

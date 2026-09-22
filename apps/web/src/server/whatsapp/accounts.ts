@@ -1,3 +1,4 @@
+import { migrateAssistant, assistantRoute } from "./assistant";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { migratePhoneRecipients, phoneSettings } from "./phone-recipients";
@@ -35,6 +36,7 @@ export function migrateAccounts(db: DatabaseSync) {
   migratePayments(db);
   migrateContacts(db);
   migratePhoneRecipients(db);
+  migrateAssistant(db);
 }
 // Invoked inside the inbox/outbox transaction; account creation, consuming consent and
 // enqueueing its reply succeed together. No provider/network work belongs in this function.
@@ -55,6 +57,16 @@ export function accountReply(
   const paymentEntry =
     account &&
     db.prepare("SELECT account_id FROM wa_payment_sessions WHERE account_id=?").get(account.id);
+  if (account && ["menu", "cancel"].includes(command))
+    assistantRoute(db, account.id, message.input, message.id);
+  if (
+    message.input.startsWith("servchat:") ||
+    (actionFor(command) === "chat" && !(paymentEntry && /^\d+$/.test(command)))
+  ) {
+    return account
+      ? assistantRoute(db, account.id, message.input, message.id)
+      : text("Create your Steward account first, then choose Ask Steward from Menu.");
+  }
   if (
     message.input.startsWith("phoneprivacy:") ||
     ["settings", "help"].includes(command) ||
@@ -160,5 +172,7 @@ export function accountReply(
         : "Create your Steward test account first: type Create account to review the details. Wallet setup is still pending.",
     );
   }
+  const chat = account && assistantRoute(db, account.id, message.input, message.id);
+  if (chat) return chat;
   return action || command === "help" ? null : menu(!!account);
 }
