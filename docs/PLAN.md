@@ -1,5 +1,7 @@
 # SERV Hackathon — wallet-to-wallet payment assistant
 
+**Current proposed next phase:** [WhatsApp custodial-wallet prototype](WHATSAPP_CUSTODIAL_PLAN.md). This changes signing authority for the new WhatsApp mode: a managed server signer executes an explicitly confirmed payment. The existing externally signed web-wallet mode remains separate. The document below describes the earlier web-first plan; its checkpoints are historical.
+
 Updated 2026-09-22. Status: initial web interface, payment API, SERV adapter and test-token contract implemented. Web production build passes; live transfers and authenticated SERV remain pending.
 Working name: Steward Pay (provisional).
 This replaces the portfolio proposal preserved in archive/PORTFOLIO_PLAN.md.
