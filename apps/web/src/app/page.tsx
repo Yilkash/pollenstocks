@@ -184,7 +184,10 @@ export default function Home() {
           removeContact={removeContact}
         />
         <footer>
-          <span>Steward Pay · Built for Robinhood Chain</span>
+          <span>
+            Steward Pay · Built for Robinhood Chain · <a href="/privacy">Privacy</a> ·{" "}
+            <a href="/data-deletion">Data deletion</a>
+          </span>
           <button
             disabled={!wallet || !config?.token || busy}
             onClick={() => void run(claimTokens)}
