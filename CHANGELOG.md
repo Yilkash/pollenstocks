@@ -59,3 +59,12 @@ Compilation checkpoint: `npm run build` passes (including TypeScript); `forge bu
 - Recognize wallet rejection through nested provider errors while preserving unknown outcomes.
 - Passed 10 backend tests, 8 browser regressions and 4 contract tests (including 256 fuzz runs). Production compilation passed.
 - Added test commands and CI coverage. See docs/RELIABILITY.md for isolation, coverage and remaining limits.
+
+## 2026-09-22 — Replacement recovery and hosting package
+
+- Accept matching speed-ups and canonical same-sender/same-nonce cancellations or replacements; retain previous transaction hashes.
+- Keep pending or unverified replacements blocked; never infer cancellation from a timeout. Refresh can move a disappeared receipt back to unknown.
+- Expose replacement-hash recovery for submitted payments and show cancelled/replaced states in chat.
+- Added 8 backend recovery subtests; backend runner reports 19 passing tests and all 8 browser regressions pass. Production build passes.
+- Added a validated non-root Docker image, persistent-volume HTTPS deployment configuration, and demo runbook. Local container startup and restart persistence checks passed. Public hosting awaits provider and domain details.
+

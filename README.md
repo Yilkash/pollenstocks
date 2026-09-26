@@ -56,5 +56,8 @@ Compilation does not verify wallet behavior, SERV integration or live transfers.
 - [Implementation plan](docs/PLAN.md)
 - [Payments research and unresolved gates](docs/PAYMENTS_RESEARCH.md)
 - [Architecture and payment lifecycle](docs/ARCHITECTURE.md)
+- [Hosting instructions](docs/HOSTING.md)
+- [Demo runbook](docs/DEMO.md)
+- [Reliability results](docs/RELIABILITY.md)
 - [Contribution and commit conventions](CONTRIBUTING.md)
 - [Historical hackathon notes](docs/NOTES.md)
