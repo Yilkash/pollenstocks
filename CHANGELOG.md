@@ -75,3 +75,8 @@ Compilation checkpoint: `npm run build` passes (including TypeScript); `forge bu
 - Live check with the production prompt and tools: five normal requests chose the same tool with and without the guard; two injection attempts were blocked. The guard added about 3 seconds per assistant message.
 - Added 5 tests; the suite reports 91 passing. TypeScript and production build pass. Deployed to Railway as 90fd3819-1baa-476d-879e-7ef6c2827f53.
 
+## 2026-09-26 — Stock trade gas check
+
+- A confirmed 0.001 AAPL sell stopped after its approval was mined: the swap's fresh gas estimate exceeded the reviewed gas units. The reviewed swap gas is the provider's estimate plus 25%, and Kyber's estimate ran low (a later check measured 313,835 by RPC vs 287,581 from Kyber; Arbitrum L1 data cost was only ~300 gas).
+- The runner now enforces the maximum network fee the user confirmed for each step (reviewed gas x reviewed price ceiling) instead of the gas-unit count. A higher estimate is sent with a 10% margin only if that limit at the actual gas price still fits the confirmed fee; otherwise the step stops as before. Price ceiling, balance, simulation and all other checks are unchanged.
+- Added 5 tests; suite reports 96 passing. TypeScript and production build pass. Deployed to Railway as 90fd3819-1baa-476d-879e-7ef6c2827f53. The earlier order left an exact 0.001 AAPL allowance to the Kyber router; the next review resets and re-approves it.

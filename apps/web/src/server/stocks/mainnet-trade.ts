@@ -58,6 +58,21 @@ export const simpleSwapParameters = parseAbiParameters(
 export function requireTrade(ok: unknown, code = "mainnet_validation_failed"): asserts ok {
   if (!ok) throw Error(code);
 }
+// The user confirms a maximum network fee per step (reviewed gas x reviewed price
+// ceiling), not a gas-unit count. Provider swap-gas figures can run low, so a
+// higher fresh estimate is accepted when, with a 10% margin, it still fits the
+// confirmed fee at the price actually used. Returns null when it does not fit.
+export function executionGasLimit(
+  estimate: bigint,
+  reviewedGas: bigint,
+  reviewedPrice: bigint,
+  actualPrice: bigint,
+): bigint | null {
+  if (estimate <= 0n || actualPrice <= 0n || actualPrice > reviewedPrice) return null;
+  if (estimate <= reviewedGas) return reviewedGas;
+  const limit = (estimate * 110n + 99n) / 100n;
+  return limit * actualPrice <= reviewedGas * reviewedPrice ? limit : null;
+}
 export const sameAddress = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 export function mainnetTradeConfig() {
   const executor = process.env.MAINNET_KYBER_EXECUTOR?.trim();

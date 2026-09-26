@@ -22,6 +22,7 @@ import {
   checkMainnetRouter,
   checkLifiRouter,
   validateMainnetPlan,
+  executionGasLimit,
 } from "./mainnet-trade";
 import { walletStillMatches, type MainnetOrder, type MainnetReview } from "./mainnet-orders";
 
@@ -173,7 +174,6 @@ export async function processMainnetTrade(
         rpc.getGasPrice(),
       ]);
       ensure(nonce === latest, "wallet_transaction_pending");
-      ensure(gas <= BigInt(planned.gas), "gas_estimate_increased");
       // RPC suggestions can lag the latest block's base fee. Raise a stale
       // suggestion to that base fee, but never exceed the confirmed ceiling.
       ensure(
@@ -185,6 +185,8 @@ export async function processMainnetTrade(
       const currentPrice =
         suggestedPrice > block.baseFeePerGas ? suggestedPrice : block.baseFeePerGas;
       const actualPrice = currentPrice < priceCeiling ? currentPrice : priceCeiling;
+      const gasLimit = executionGasLimit(gas, BigInt(planned.gas), priceCeiling, actualPrice);
+      ensure(gasLimit !== null, "gas_estimate_increased");
       const remainingFee = p.steps
         .slice(step.position)
         .reduce((sum, s) => sum + BigInt(s.gas) * BigInt(s.gasPrice), 0n);
@@ -233,7 +235,7 @@ export async function processMainnetTrade(
               value: "0x0",
               data: planned.data,
               nonce: toHex(nonce),
-              gas_limit: toHex(BigInt(planned.gas)),
+              gas_limit: toHex(gasLimit),
               gas_price: toHex(actualPrice),
               type: 0,
             },
@@ -391,7 +393,7 @@ export async function processMainnetTrade(
       const reasons: Record<string, string> = {
         network_fee_increased: "Network fees rose above this review’s limit.",
         gas_price_unavailable: "Current network fees could not be checked.",
-        gas_estimate_increased: "The transaction now needs more gas than reviewed.",
+        gas_estimate_increased: "The network fee would now exceed the maximum you confirmed.",
         wallet_transaction_pending: "Another wallet transaction is still pending.",
         insufficient_eth_for_network_fee: "The wallet needs more ETH for gas.",
         wallet_setup_changed: "The wallet setup changed.",
