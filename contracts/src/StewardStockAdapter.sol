@@ -46,9 +46,12 @@ contract StewardStockAdapter is ReentrancyGuard {
     }
 
     function supportedStock(address stock) public pure returns (bool) {
+        // forgefmt: disable-start
         return stock == 0xC9f9c86933092BbbfFF3CCb4b105A4A94bf3Bd4E
-            || stock == 0x71178BAc73cBeb415514eB542a8995b82669778d || stock == 0x3b8262A63d25f0477c4DDE23F83cfe22Cb768C93
+            || stock == 0x71178BAc73cBeb415514eB542a8995b82669778d
+            || stock == 0x3b8262A63d25f0477c4DDE23F83cfe22Cb768C93
             || stock == 0x5884aD2f920c162CFBbACc88C9C51AA75eC09E02;
+        // forgefmt: disable-end
     }
 
     function trade(bytes32 orderId, address stock, bool buy, uint256 amountIn, uint256 minAmountOut, uint256 deadline)
