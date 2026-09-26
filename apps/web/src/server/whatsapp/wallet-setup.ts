@@ -113,7 +113,7 @@ export function walletSetupReply(
     interactive: {
       type: "button",
       body: {
-        text: "Set up your Steward test wallet\n\nPrivy will create and protect the wallet's private key. Steward controls this wallet through its authorization key. Access to this WhatsApp account gives access to your Steward account.\n\nThe wallet is for Robinhood Chain testnet. Demo USD has no monetary value. Creating it does not add funds or enable payments. Phone-number recipient lookup stays off.\n\nContinue to create the wallet? This confirmation expires in 10 minutes.",
+        text: "Your account is ready. Next, set up your test wallet.\n\nPrivy will create and protect the wallet's private key. Steward controls this wallet through its authorization key. Access to this WhatsApp account gives access to your Steward account.\n\nThe wallet is for Robinhood Chain testnet. Demo USD has no monetary value. Creating it does not add funds or enable payments. Phone-number recipient lookup stays off.\n\nContinue to create the wallet? This confirmation expires in 10 minutes.",
       },
       action: {
         buttons: [

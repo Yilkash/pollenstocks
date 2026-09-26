@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { getAddress, zeroAddress, formatUnits, parseUnits } from "viem";
+import { getAddress, zeroAddress, formatUnits, parseUnits, formatEther } from "viem";
 import { seal, senderLookup } from "./config";
 import { normalizePhone, resolvePhoneRecipient } from "./phone-recipients";
 import { contactList, contactById, contactByName } from "./contacts";
@@ -58,6 +58,47 @@ export function paymentById(db: DatabaseSync, id: string) {
 export function confirmationToken() {
   return randomBytes(24).toString("hex");
 }
+// Resume the immutable existing review instead of making the user hunt for it.
+// Rotating the confirmation token invalidates old buttons without extending expiry.
+export function activePaymentReply(db: DatabaseSync, p: Payment) {
+  const details = `${formatUnits(BigInt(p.amount), 6)} Demo USD\nTo: ${p.destination}`;
+  if (p.state === "review" && p.expires > Date.now() && p.gas && p.gas_price) {
+    const token = confirmationToken();
+    const changed = db
+      .prepare(
+        "UPDATE wa_payments SET confirmation_hash=? WHERE id=? AND state='review' AND expires>?",
+      )
+      .run(digest(token), p.id, Date.now());
+    if (changed.changes !== 1)
+      return text("The payment state changed. Type Recent to see its current status.");
+    return {
+      type: "interactive",
+      interactive: {
+        type: "button",
+        body: {
+          text: `Your earlier payment is awaiting approval. Nothing has been sent for this review.\n\n${details}\n\nNetwork: Robinhood Chain testnet\nMaximum network fee: ${formatEther(BigInt(p.gas) * BigInt(p.gas_price))} test ETH\nExpires: ${new Date(p.expires).toISOString().replace("T", " ").replace(".000Z", " UTC")}\n\nUse these latest buttons to confirm this exact payment or cancel it before starting a different one. No new payment was created. Test assets have no monetary value.`,
+        },
+        action: {
+          buttons: [
+            {
+              type: "reply",
+              reply: { id: `pay:confirm:${p.id}:${token}`, title: "Confirm payment" },
+            },
+            { type: "reply", reply: { id: `pay:cancel:${p.id}:${token}`, title: "Cancel" } },
+          ],
+        },
+      },
+    };
+  }
+  if (p.state === "quoting")
+    return text(
+      `I’m still preparing your earlier review. Nothing has been sent.\n\n${details}\n\nType Recent for status, or Cancel to discard the unfinished review.`,
+    );
+  return text(
+    `Your earlier payment was already approved and is being checked. I won’t create a duplicate.\n\n${details}\nStatus: ${p.state}\n${p.tx_hash ? "\nhttps://explorer.testnet.chain.robinhood.com/tx/" + p.tx_hash + "\n" : ""}\nI’ll send its result here. Type Recent for the latest status.`,
+  );
+}
+
 // Synchronous routing; called within the durable inbox transaction.
 export function paymentReply(
   db: DatabaseSync,
@@ -185,10 +226,7 @@ export function paymentReply(
     return null;
   }
   if (action === "send" || lower === "send") {
-    if (active)
-      return text(
-        "You already have a payment awaiting review or confirmation from the network. Use its Confirm/Cancel buttons, or choose Recent activity for its status.",
-      );
+    if (active) return activePaymentReply(db, active);
     db.prepare(
       "INSERT INTO wa_payment_sessions(account_id,stage,expires) VALUES(?,'address',?) ON CONFLICT(account_id) DO UPDATE SET stage='address',destination=NULL,expires=excluded.expires",
     ).run(wallet.id, now + 600000);

@@ -64,11 +64,11 @@ export async function balanceReply(db: DatabaseSync, key: Buffer, phone: string,
       const enough = demoUsd >= parseUnits(amount, 6);
       const reserve = 100000000000000n;
       return text(
-        `For ${amount} Demo USD:\n\n${enough ? "Your Demo USD balance covers the amount." : "Your Demo USD balance is too low."}\n${testEth >= reserve ? "Your test ETH covers the conservative 0.0001 test ETH fee reserve." : "Your test ETH is below the conservative 0.0001 test ETH fee reserve; an exact payment review is needed."}\n\nBalance: ${formatUnits(demoUsd, decimals)} Demo USD\nNetwork fees: ${formatEther(testEth)} test ETH\n\nThis is a balance check, not a payment approval. The exact fee, pending payments and spending limits are checked during payment review. Nothing was prepared or sent.`,
+        `${amount} Demo USD: ${enough ? "balance covers it" : "insufficient balance"}.\nFee reserve (0.0001 test ETH): ${testEth >= reserve ? "covered" : "not covered"}.\n\nBalance: ${formatUnits(demoUsd, decimals)} Demo USD\nGas balance: ${formatEther(testEth)} test ETH\n\nFinal fees, pending payments and limits are checked at review. Nothing sent.`,
       );
     }
     return text(
-      `Your Steward balance\n\nDemo USD: ${formatUnits(demoUsd, decimals)}\nTest ETH (network fees): ${formatEther(testEth)}\n\nNetwork: Robinhood Chain testnet\nChecked at ${new Date(Number(block.timestamp) * 1000).toISOString().replace("T", " ").replace(".000Z", " UTC")}\n\n${demoUsd === 0n && testEth === 0n ? "Your wallet currently has no Demo USD or test ETH. Choose Receive payment to see its address.\n\n" : ""}Test assets have no monetary value. Type Balance to refresh or Menu to return.`,
+      `Your balance · Robinhood testnet\n\nDemo USD: ${formatUnits(demoUsd, decimals)}\nGas: ${formatEther(testEth)} test ETH\n\n${demoUsd === 0n && testEth === 0n ? "Choose Receive payment to fund your test wallet.\n" : ""}Test tokens have no monetary value.\nType Balance to refresh.`,
     );
   } catch {
     // Never turn an unavailable RPC or token response into an invented zero balance.
