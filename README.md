@@ -22,6 +22,25 @@ Buy **Apple, NVIDIA and Tesla** stock tokens with USDG on **Robinhood Chain**, j
 
 ---
 
+## 📱 See it in action
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/images/whatsapp-sell-review.jpg" alt="Steward showing an exact review to sell 0.001 AAPL for USDG" width="300"/>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/images/whatsapp-buy-receipt.jpg" alt="Steward confirming an AAPL buy with an explorer link, then showing holdings" width="300"/>
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><b>Sell in plain language</b><br/>"I want to sell some of my apple shares" becomes an exact review, with a LI.FI route, minimum output and fee ceiling.</td>
+    <td align="center"><b>Real mainnet receipts</b><br/>A confirmed AAPL buy with its explorer link, followed by live holdings.</td>
+  </tr>
+</table>
+
+---
+
 ## 💡 Why Steward
 
 Robinhood Chain puts real stock tokens on-chain, but getting them still takes a crypto wallet, a DEX, token approvals, slippage settings and gas. Most people who want a slice of Apple or Tesla will never touch any of that. They do use WhatsApp every day.
@@ -179,12 +198,12 @@ AI suggests. Deterministic code decides. You confirm.
 
 Real trades executed through Steward on Robinhood Chain:
 
-| Trade                                              | Transaction                                                                                                                  |
-| -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Buy AAPL with 0.5 USDG, receiving 0.001467882 AAPL | [`0x6f92e708…`](https://robinhoodchain.blockscout.com/tx/0x6f92e708761a6a7da54315908a31d9dcf814fde569c58b4f5b1867bb9640af0c) |
-| Buy AAPL with 0.5 USDG                             | [`0x5091fac8…`](https://robinhoodchain.blockscout.com/tx/0x5091fac8af4ae6a7165664b95f32b7127557fee6b57ef5144e26210f285ad8d9) |
-| Stock-token swap                                   | [`0x9a875b39…`](https://robinhoodchain.blockscout.com/tx/0x9a875b3943b63bd02ab79808ed1bb27b9e75720a7836b0f46bce4c81e374e091) |
-| Stock-token swap                                   | [`0xd66ab3d3…`](https://robinhoodchain.blockscout.com/tx/0xd66ab3d390106dc399c6caf6a99c86f08ec6989e1e94738685dd60f3292699ba) |
+| Trade                                                 | Transaction                                                                                                                  |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Buy AAPL with 0.5 USDG, receiving 0.001467882 AAPL    | [`0x6f92e708…`](https://robinhoodchain.blockscout.com/tx/0x6f92e708761a6a7da54315908a31d9dcf814fde569c58b4f5b1867bb9640af0c) |
+| Buy AAPL with 0.5 USDG                                | [`0x5091fac8…`](https://robinhoodchain.blockscout.com/tx/0x5091fac8af4ae6a7165664b95f32b7127557fee6b57ef5144e26210f285ad8d9) |
+| Buy AAPL, receiving 0.000594778 AAPL (pictured above) | [`0x9a875b39…`](https://robinhoodchain.blockscout.com/tx/0x9a875b3943b63bd02ab79808ed1bb27b9e75720a7836b0f46bce4c81e374e091) |
+| Stock-token swap                                      | [`0xd66ab3d3…`](https://robinhoodchain.blockscout.com/tx/0xd66ab3d390106dc399c6caf6a99c86f08ec6989e1e94738685dd60f3292699ba) |
 
 **Supported assets (Robinhood Chain mainnet 4663)**
 
