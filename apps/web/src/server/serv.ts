@@ -4,6 +4,7 @@ import { settings } from "./config";
 import { store, newId } from "./store";
 import { balances, paymentInput, prepare, recipientFor, refresh } from "./payments";
 import { AppError, type Payment } from "@/lib/shared";
+import { chatCompletionRefused, promptGuardChatTool } from "./serv-guard";
 
 const tool = (
   name: string,
@@ -75,7 +76,7 @@ export async function chat(wallet: Address, text: string) {
       body: JSON.stringify({
         model: process.env.SERV_MODEL || "gpt-5.4-mini",
         messages,
-        tools,
+        tools: [...tools, promptGuardChatTool],
         tool_choice: "auto",
         parallel_tool_calls: false,
         max_completion_tokens: 700,
@@ -88,6 +89,15 @@ export async function chat(wallet: Address, text: string) {
         502,
       );
     const data = await response.json();
+    if (chatCompletionRefused(data)) {
+      if (draft) break; // Keep an already prepared draft; its fixed answer is below.
+      // Not saved to history, so a refused request is not replayed on later turns.
+      return {
+        answer:
+          "I can't help with that request. I can check balances, look up saved contacts and prepare Demo USD payment drafts. No payment was sent.",
+        draft: null,
+      };
+    }
     const reply = data.choices?.[0]?.message as Message | undefined;
     if (!reply) throw new AppError("SERV returned an invalid response.", 502);
     if (!reply.tool_calls?.length) {

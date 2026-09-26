@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ServRefusal } from "../serv-guard";
 
 // Keep the local tool dispatcher independent of the provider's response envelope.
 // Reasoning output is deliberately excluded from user replies and stored history.
@@ -6,6 +7,7 @@ export function responseMessage(body: unknown) {
   const result = z
     .object({
       status: z.string().optional(),
+      incomplete_details: z.object({ reason: z.string().optional() }).nullable().optional(),
       output_text: z.string().nullable().optional(),
       output: z
         .array(
@@ -27,6 +29,9 @@ export function responseMessage(body: unknown) {
         .default([]),
     })
     .parse(body);
+  // Prompt guard and content-filter refusals arrive as incomplete responses.
+  if (result.status === "incomplete" && result.incomplete_details?.reason === "content_filter")
+    throw new ServRefusal();
   if (result.status && result.status !== "completed") throw Error("serv_incomplete");
   const tool_calls = result.output
     .filter((item) => item.type === "function_call")

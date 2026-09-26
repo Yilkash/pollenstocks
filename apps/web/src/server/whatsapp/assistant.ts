@@ -13,6 +13,7 @@ import { paymentById } from "./payments";
 import { reviewPayment } from "./payment-runner";
 import { conversationRules, privateResponseContext } from "./assistant-conversation";
 import { responseMessage } from "./assistant-inference";
+import { chatCompletionRefused, promptGuardResponsesTool, ServRefusal } from "../serv-guard";
 
 const VERSION = "serv-direct-chat-v3";
 const digest = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -252,12 +253,15 @@ export async function assistantReply(
               },
               { role: "user", content: input },
             ],
-            tools: assistantTools.map(({ function: definition }) => ({
-              type: "function",
-              ...definition,
-              // Missing fields are intentional: the local tool collects them safely.
-              strict: false,
-            })),
+            tools: [
+              ...assistantTools.map(({ function: definition }) => ({
+                type: "function",
+                ...definition,
+                // Missing fields are intentional: the local tool collects them safely.
+                strict: false,
+              })),
+              promptGuardResponsesTool,
+            ],
             tool_choice: "auto",
             parallel_tool_calls: false,
             max_output_tokens: 4096,
@@ -366,7 +370,9 @@ export async function assistantReply(
         });
         if (response.ok) {
           const result = await response.json();
-          const prose = result.choices?.[0]?.message?.content;
+          const prose = chatCompletionRefused(result)
+            ? undefined
+            : result.choices?.[0]?.message?.content;
           const facts = (value: string) =>
             (value.match(/\d+(?:\.\d+)?|\b(?:USDG|AAPL|TSLA|NVDA)\b/g) ?? []).sort().join("|");
           const priceLines = sourceText
@@ -408,7 +414,12 @@ export async function assistantReply(
       ).run(account.id, account.id);
     }
     return output;
-  } catch {
+  } catch (error) {
+    // Refused requests are not saved to history, so they are not replayed next turn.
+    if (error instanceof ServRefusal)
+      return text(
+        "I can’t help with that request. I can help with payments, balances and supported stock tokens. No payment was sent.",
+      );
     return text(
       "I couldn’t complete that request right now. No payment was sent by chat. Try again or use Menu for the direct tools.",
     );

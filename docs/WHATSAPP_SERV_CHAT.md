@@ -117,3 +117,6 @@ approval review. Compatibility checks used newly written synthetic prompts and t
 instead. No user conversations or wallet data were used. OpenServ Responses requests
 use store:false; retained chat context stays within the existing approved scope.
 
+## Prompt guard (2026-09-26)
+
+The assistant request declares SERV's `serv_prompt_guard` marker tool (see `apps/web/src/server/serv-guard.ts`). SERV strips it before the model runs and judges the user input for prompt injection first. A blocked request returns an incomplete response with reason `content_filter`; Steward replies with a fixed refusal, sends no payment, and does not store the turn in history. This is a defence layer on top of, not a replacement for, the application's own tool validation, review and confirmation checks. Blocked requests appear in the SERV console Safety report.

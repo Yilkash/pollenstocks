@@ -68,3 +68,10 @@ Compilation checkpoint: `npm run build` passes (including TypeScript); `forge bu
 - Added 8 backend recovery subtests; backend runner reports 19 passing tests and all 8 browser regressions pass. Production build passes.
 - Added a validated non-root Docker image, persistent-volume HTTPS deployment configuration, and demo runbook. Local container startup and restart persistence checks passed. Public hosting awaits provider and domain details.
 
+## 2026-09-26 — SERV prompt guard
+
+- Declared SERV's `serv_prompt_guard` on the WhatsApp assistant request and the web payment chat. SERV checks user input for prompt injection before the model runs.
+- Refusals arrive as HTTP 200 content-filter responses. They now produce a fixed "can't help, no payment was sent" reply, are never shown as a model answer, and are not saved to chat history. The WhatsApp wording pass discards refused output.
+- Live check with the production prompt and tools: five normal requests chose the same tool with and without the guard; two injection attempts were blocked. The guard added about 3 seconds per assistant message.
+- Added 5 tests; the suite reports 91 passing. TypeScript and production build pass. Deployed to Railway as 90fd3819-1baa-476d-879e-7ef6c2827f53.
+
