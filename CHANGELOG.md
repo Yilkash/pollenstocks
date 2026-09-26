@@ -80,3 +80,10 @@ Compilation checkpoint: `npm run build` passes (including TypeScript); `forge bu
 - A confirmed 0.001 AAPL sell stopped after its approval was mined: the swap's fresh gas estimate exceeded the reviewed gas units. The reviewed swap gas is the provider's estimate plus 25%, and Kyber's estimate ran low (a later check measured 313,835 by RPC vs 287,581 from Kyber; Arbitrum L1 data cost was only ~300 gas).
 - The runner now enforces the maximum network fee the user confirmed for each step (reviewed gas x reviewed price ceiling) instead of the gas-unit count. A higher estimate is sent with a 10% margin only if that limit at the actual gas price still fits the confirmed fee; otherwise the step stops as before. Price ceiling, balance, simulation and all other checks are unchanged.
 - Added 5 tests; suite reports 96 passing. TypeScript and production build pass. Deployed to Railway as 90fd3819-1baa-476d-879e-7ef6c2827f53. The earlier order left an exact 0.001 AAPL allowance to the Kyber router; the next review resets and re-approves it.
+
+## 2026-09-26 — Close mainnet steps that were never broadcast
+
+- Order 965c626f blocked every new payment and trade for its account. Its first step was marked submitting with nonce 7, the Privy send errored without a hash, and reconciliation required exactly one Privy record with a hash, so the order stayed unknown forever. The wallet's latest and pending nonces were still 7: nothing reached the chain.
+- The runner now closes such a step as failed (`not_broadcast`) only when Privy has no record or only a failed/provider_error record without a hash, the order expired more than 2 minutes ago (the Privy request never outlives the order), and the wallet's latest and pending nonces both still equal the step's nonce. The user is told nothing was sent. Any other case stays unknown for review.
+- Logs now record why an order step stopped and what the Privy reference lookup returned, without secrets.
+- Added 5 tests; suite reports 101 passing. TypeScript and production build pass.

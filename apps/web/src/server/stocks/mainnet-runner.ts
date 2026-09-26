@@ -25,6 +25,11 @@ import {
   executionGasLimit,
 } from "./mainnet-trade";
 import { walletStillMatches, type MainnetOrder, type MainnetReview } from "./mainnet-orders";
+import {
+  privyNeverBroadcast,
+  unsentStepCanClose,
+  type PrivyReferenceTransaction,
+} from "./unsent-step";
 
 type Step = {
   position: number;
@@ -269,16 +274,53 @@ export async function processMainnetTrade(
         },
       );
       ensure(response.ok);
-      const result = (await response.json()) as {
-        transactions?: {
-          transaction_hash: string | null;
-          wallet_id: string;
-          reference_id: string;
-          caip2: string;
-        }[];
-      };
-      ensure(result.transactions?.length === 1);
-      const tx = result.transactions[0];
+      const result = (await response.json()) as { transactions?: PrivyReferenceTransaction[] };
+      const found = result.transactions ?? [];
+      console.warn("Mainnet reconciliation lookup", {
+        order: order.id.slice(0, 8),
+        step: step.position,
+        found: found.length,
+        status: found[0]?.status ?? null,
+        hasHash: Boolean(found[0]?.transaction_hash),
+      });
+      if (
+        privyNeverBroadcast(found, {
+          walletId: review.wallet.provider_id,
+          referenceId: step.reference_id,
+        })
+      ) {
+        const [latestNonce, pendingNonce] = await Promise.all([
+          rpc.getTransactionCount({ address: p.wallet, blockTag: "latest" }),
+          rpc.getTransactionCount({ address: p.wallet, blockTag: "pending" }),
+        ]);
+        if (
+          unsentStepCanClose({
+            neverBroadcast: true,
+            orderExpires: order.expires,
+            now: Date.now(),
+            stepNonce: step.nonce ?? null,
+            latestNonce,
+            pendingNonce,
+          })
+        ) {
+          const earlier = db
+            .prepare(
+              "SELECT 1 FROM wa_mainnet_steps WHERE order_id=? AND position<? AND state='confirmed' LIMIT 1",
+            )
+            .get(order.id, step.position);
+          db.prepare(
+            "UPDATE wa_mainnet_steps SET state='failed' WHERE order_id=? AND position=? AND state='submitting' AND tx_hash IS NULL",
+          ).run(order.id, step.position);
+          finish(
+            "failed",
+            "not_broadcast",
+            `This ${p.side === "send" ? "payment" : "trade"} was not sent. ${earlier ? "An earlier approval was confirmed, so its fee was charged and the allowance may remain." : "Nothing reached the chain; no gas was spent."} You can start a new one.`,
+          );
+          return;
+        }
+      }
+      ensure(found.length === 1);
+      const tx = found[0];
       ensure(
         tx.wallet_id === review.wallet.provider_id &&
           tx.reference_id === step.reference_id &&
@@ -381,6 +423,12 @@ export async function processMainnetTrade(
       throw e;
     }
   } catch (error) {
+    console.warn("Mainnet order step stopped", {
+      order: order.id.slice(0, 8),
+      submitted,
+      error:
+        error instanceof Error ? `${error.name}: ${error.message}`.slice(0, 300) : String(error),
+    });
     if (submitted)
       finish(
         "unknown",
