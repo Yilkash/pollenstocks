@@ -44,6 +44,9 @@ export function AssistantChat({
                 : undefined;
             const updated = payment && payment.status !== "draft";
             const descriptions = {
+              cancelled: "Cancelled by an included transaction using the same nonce.",
+              replaced:
+                "Replaced by a different included transaction. Inspect its receipt before sending again.",
               signing: "Waiting for the wallet outcome. Do not submit it again.",
               submitted: "Submitted. Refresh the receipt to check chain inclusion.",
               included:

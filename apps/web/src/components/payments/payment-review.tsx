@@ -93,11 +93,12 @@ export function PaymentReview({
               )}
             </p>
           )}
-          {["signing", "unknown"].includes(review.status) && !review.hash && (
+          {["signing", "unknown", "submitted"].includes(review.status) && (
             <>
               <p className="small">
-                Check your wallet’s activity before taking further action. If it sent the payment,
-                recover its transaction hash here.
+                Paste the payment, speed-up, or cancellation hash from your wallet activity. A
+                cancellation or different replacement must be included on chain before this payment
+                is released.
               </p>
               <input
                 aria-label="Transaction hash"
@@ -110,6 +111,9 @@ export function PaymentReview({
               </button>
             </>
           )}
+          {review.previousHashes?.length ? (
+            <p className="small">Previous transaction hashes: {review.previousHashes.join(", ")}</p>
+          ) : null}
           {review.hash && (
             <button disabled={busy} onClick={() => void run(refreshReceipt)}>
               <RefreshCw size={15} />

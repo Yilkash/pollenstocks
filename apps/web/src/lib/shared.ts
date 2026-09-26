@@ -44,7 +44,9 @@ export type PaymentStatus =
   | "rejected"
   | "failed"
   | "unknown"
-  | "expired";
+  | "expired"
+  | "cancelled"
+  | "replaced";
 export interface Payment {
   id: string;
   requestId: string;
@@ -63,6 +65,7 @@ export interface Payment {
   expiresAt: number;
   status: PaymentStatus;
   hash: Hex | null;
+  previousHashes?: Hex[];
   error: string | null;
 }
 export interface Contact {

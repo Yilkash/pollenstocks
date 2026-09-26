@@ -1,15 +1,9 @@
+import { minedOutcome, samePaymentNonce } from "@/lib/recovery";
 import { createPublicClient, http, erc20Abi, formatUnits, type Address, type Hex } from "viem";
 import { z } from "zod";
 import { settings } from "./config";
 import { store, newId } from "./store";
-import {
-  address,
-  amountUnits,
-  AppError,
-  hasExpectedTransfer,
-  transactionMatches,
-  type Payment,
-} from "@/lib/shared";
+import { address, amountUnits, AppError, transactionMatches, type Payment } from "@/lib/shared";
 
 export const paymentInput = z
   .object({
@@ -143,71 +137,85 @@ export async function claim(wallet: Address, id: string) {
   const nonce = await client().getTransactionCount({ address: wallet, blockTag: "pending" });
   return store().claim({ ...p, ...fee, nonce });
 }
+// Only receipt-backed replacements release the pending slot. A missing transaction is not cancellation.
+async function settleMined(p: Payment, hash: Hex, c: Awaited<ReturnType<typeof checkedClient>>) {
+  const [tx, receipt] = await Promise.all([
+    c.getTransaction({ hash }),
+    c.getTransactionReceipt({ hash }),
+  ]);
+  const block = await c.getBlock({ blockNumber: receipt.blockNumber });
+  if (
+    receipt.transactionHash.toLowerCase() !== hash.toLowerCase() ||
+    tx.blockHash !== receipt.blockHash ||
+    block.hash !== receipt.blockHash
+  ) {
+    throw new AppError(
+      "The transaction is not confirmed in a canonical block. Check again shortly.",
+      409,
+    );
+  }
+  if (!samePaymentNonce(p, tx))
+    throw new AppError("That transaction does not match this payment's sender and nonce.", 409);
+  const outcome = minedOutcome(p, tx, receipt);
+  const previousHashes = [
+    ...new Set([...(p.previousHashes || []), ...(p.hash && p.hash !== hash ? [p.hash] : [])]),
+  ];
+  return store().transition({ ...p, ...outcome, hash, previousHashes }, [p.status]);
+}
 export async function attachHash(wallet: Address, id: string, hash: Hex) {
   const p = store().payment(wallet, id);
+  if (p.chainId !== settings().chain.id)
+    throw new AppError("Payment network does not match the configured chain.", 409);
   if (p.hash === hash) return refresh(wallet, id);
   if (!["signing", "unknown", "submitted"].includes(p.status))
     throw new AppError("This payment is not awaiting a transaction.", 409);
-  // Attach only a transaction with the exact reviewed payload and reserved nonce.
   const c = await checkedClient();
   let tx;
   try {
     tx = await c.getTransaction({ hash });
   } catch {
-    throw new AppError(
-      "Transaction not visible yet. Keep this hash and retry receipt recovery shortly.",
-      409,
-    );
+    throw new AppError("Transaction not visible yet. Keep the hash and check again shortly.", 409);
   }
-  if (!transactionMatches(p, tx))
-    throw new AppError("That transaction does not match this payment.", 409);
-  store().transition({ ...p, hash, status: "submitted", error: null }, [
-    "signing",
-    "unknown",
-    "submitted",
-  ]);
+  if (!samePaymentNonce(p, tx))
+    throw new AppError("That transaction does not match this payment's sender and nonce.", 409);
+  if (!transactionMatches(p, tx)) {
+    // A pending cancellation can still lose to the original transaction. Do not unlock yet.
+    if (tx.blockHash === null)
+      throw new AppError(
+        "The replacement is still pending. Wait for inclusion before recovery.",
+        409,
+      );
+    return settleMined(p, hash, c);
+  }
+  const previousHashes = [
+    ...new Set([...(p.previousHashes || []), ...(p.hash && p.hash !== hash ? [p.hash] : [])]),
+  ];
+  store().transition({ ...p, hash, previousHashes, status: "submitted", error: null }, [p.status]);
   return refresh(wallet, id);
 }
 export async function refresh(wallet: Address, id: string) {
   const p = store().payment(wallet, id);
   if (p.chainId !== settings().chain.id)
     throw new AppError("This payment belongs to a different network.", 409);
-  if (!p.hash || !["submitted", "unknown", "included"].includes(p.status)) return p;
+  if (
+    !p.hash ||
+    !["submitted", "unknown", "included", "cancelled", "replaced", "failed"].includes(p.status)
+  )
+    return p;
   const c = await checkedClient();
-  let receipt;
   try {
-    receipt = await c.getTransactionReceipt({ hash: p.hash });
-  } catch {
-    if (p.status === "included")
+    return await settleMined(p, p.hash, c);
+  } catch (e) {
+    if (["included", "cancelled", "replaced", "failed"].includes(p.status))
       return store().transition(
         {
           ...p,
           status: "unknown",
-          error: "Inclusion could not be reconfirmed. Check again before any retry.",
+          error: "The previous receipt could not be reconfirmed. Check again before any retry.",
         },
-        ["included"],
+        [p.status],
       );
+    if (e instanceof AppError) throw e;
     return p;
   }
-  const tx = await c.getTransaction({ hash: p.hash });
-  if (!transactionMatches(p, tx))
-    return store().transition(
-      { ...p, status: "failed", error: "Transaction payload does not match the reviewed payment." },
-      [p.status],
-    );
-  if (receipt.status !== "success")
-    return store().transition(
-      {
-        ...p,
-        status: "failed",
-        error: "The transaction reverted. No successful payment was confirmed.",
-      },
-      [p.status],
-    );
-  if (!hasExpectedTransfer(p, receipt.logs))
-    return store().transition(
-      { ...p, status: "failed", error: "No matching token transfer was found in this receipt." },
-      [p.status],
-    );
-  return store().transition({ ...p, status: "included", error: null }, [p.status]);
 }

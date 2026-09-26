@@ -44,3 +44,11 @@ Browser checks start a separate production server on port 3101. From contracts, 
 These browser checks simulate wallet extensions; the user's actual extension still needs confirmation after refreshing. They do not certify every wallet provider or chain reorganization behavior. Unknown transactions without a recoverable hash can still leave an intent blocked; cancellation/replacement reconciliation remains unfinished.
 
 Hosted deployment and organizer confirmation of testnet-only eligibility remain pending.
+
+## Recovery and container checkpoint
+
+The backend runner now reports 19 passing tests (the original 10 plus a parent recovery test and 8 recovery subtests). All 8 browser regressions still pass. New cases cover pending cancellation, mined self-transfer cancellation, a changed recipient, speed-up with a matching event, unrelated sender/nonce/network, noncanonical receipt evidence, reverted replacement and a disappearing cancellation receipt.
+
+The production Docker image builds and serves HTTP 200. A local container check confirmed non-root UID 1000, writable SQLite storage, absence of .env.local in the image, and persistence across restart. The temporary container used no SERV key or real wallet and was removed afterward. Compose configuration validates with example values. Live HTTPS certificate issuance and public hosting remain unverified until a server/domain are configured.
+
+Manual hash-based cancellation/replacement recovery supersedes the earlier unfinished-reconciliation note above. Automatic nonce scanning and no-hash resolution remain out of scope.
