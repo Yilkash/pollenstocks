@@ -1,21 +1,49 @@
 export const actions = [
+  ["chat", "Ask Steward"],
   ["create", "Create account"],
   ["balance", "View balance"],
   ["send", "Send payment"],
   ["receive", "Receive payment"],
   ["history", "Recent activity"],
   ["contacts", "Manage contacts"],
-  ["chat", "Ask Steward"],
   ["help", "Help & settings"],
 ] as const;
 export const text = (body: string) => ({ type: "text", text: { body } });
+export const capabilities = [
+  "Hi, I’m Steward 👋",
+  "",
+  "💸 Send, receive and check balances",
+  "📋 Track payments and manage contacts",
+  "📈 Buy, sell and track stock tokens",
+  "",
+  "Payments use USDG on Robinhood mainnet.",
+  "Payments and trades require confirmation.",
+].join("\n");
+export function onboardingWelcome() {
+  return {
+    type: "interactive",
+    interactive: {
+      type: "button",
+      body: {
+        text: "Hi, I’m Steward 👋\nSend USDG, check balances and trade stock tokens on Robinhood mainnet.\n\nCreate your account to begin. Mainnet transactions use real assets.",
+      },
+      action: {
+        buttons: [{ type: "reply", reply: { id: "menu:create", title: "Create account" } }],
+      },
+    },
+  };
+}
 export function menu(hasAccount = false) {
   return {
     type: "interactive",
     interactive: {
       type: "list",
       body: {
-        text: "Welcome to Steward 👋\nYour WhatsApp payment assistant.\n\nRobinhood Chain testnet · Demo USD has no monetary value. View your balance, receive funds, or review a Demo USD payment.\n\nChoose an option to learn more.",
+        text:
+          capabilities +
+          (hasAccount
+            ? "\n\nChoose a shortcut, or Ask Steward to chat. OpenServ processes chat messages, recent context and task details."
+            : "\n\nChoose Create account to begin."),
       },
       action: {
         button: "Open menu",
@@ -47,6 +75,7 @@ export function actionFor(input: string) {
     ].includes(command)
   )
     return "balance";
+  if (["recent", "activity", "history"].includes(command)) return "history";
   const action = actions.find(
     ([id, label], index) =>
       command === "menu:" + id || command === label.toLowerCase() || command === String(index + 1),
@@ -58,16 +87,13 @@ export function reply(input: string) {
   const action = actionFor(input);
   if (action === "create")
     return text(
-      "Steward accounts will have a wallet controlled by Steward for testnet payments. Demo USD has no monetary value. Account creation is not available yet; no account or wallet has been created. Type Menu to return.",
+      "Create your Steward account to get a mainnet wallet. Transactions require your confirmation. Type Menu to begin.",
     );
   if (action === "help" || command === "help")
     return text(
-      "Steward is a testnet payment prototype. Create your account and wallet, view your balance, or send Demo USD to a wallet address after reviewing and confirming in WhatsApp. Manage contacts to save names and wallet addresses. Recipients can enable phone-number payments in Help & settings. Limits: 1,000 Demo USD per payment and 5,000 per rolling 24 hours. Never share a seed phrase or private key. Type Menu to return.",
+      "Help\n\n• Payments: review, then confirm.\n• Contacts: save names and addresses.\n• Phone payments: recipient lookup must be enabled.\n• Limits: 1,000 USDG per payment.\n\nMainnet payments use real USDG. Never share wallet secrets.\nType Menu to return.",
     );
-  if (action === "chat")
-    return text(
-      "Create your Steward account first, then choose Ask Steward to review the chat opt-in. Type Menu to return.",
-    );
+  if (action === "chat") return text("Create your account first, then choose Ask Steward to chat.");
   if (action)
     return text(
       "This feature needs a Steward wallet. Wallet setup is not available yet, and no payment has been prepared or sent. Type Menu to return.",

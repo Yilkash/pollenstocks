@@ -80,7 +80,7 @@ export function phoneSettings(db: DatabaseSync, account: string, input: string, 
   if (input.startsWith("phoneprivacy:"))
     return text("This setting action is invalid. Open Help & settings again.");
   return buttons(
-    `Help & settings\n\nPhone-number payments: ${row.phone_lookup ? "ON" : "OFF"}\n\nThis setting controls whether other Steward users can find your wallet by entering your full WhatsApp number.\n\nPayments use Robinhood testnet Demo USD. Limits: 1,000 per payment and 5,000 per rolling 24 hours. Never share a private key.`,
+    `Help & settings\n\nPhone-number payments: ${row.phone_lookup ? "ON" : "OFF"}\n\nThis setting controls whether other Steward users can find your wallet by entering your full WhatsApp number.\n\nPayments use USDG on Robinhood mainnet. Limit: 1,000 USDG per payment. Transfers require your confirmation. Never share a private key.`,
     [
       {
         id: row.phone_lookup ? "phoneprivacy:disable" : "phoneprivacy:enable",

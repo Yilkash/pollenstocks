@@ -166,7 +166,7 @@ export function contactsReply(db: DatabaseSync, key: Buffer, account: string, in
     if (!c) return text("This contact no longer exists. Type Manage contacts to refresh.");
     if (pick[1] === "pick") {
       clear();
-      return buttons(`${c.name}\n${c.address}\nRobinhood Chain testnet`, [
+      return buttons(`${c.name}\n${c.address}\nVerify the recipient address on Robinhood mainnet`, [
         { id: "contact:edit:" + c.id, title: "Edit contact" },
         { id: "contact:delete:" + c.id, title: "Delete contact" },
         { id: "contact:page:0", title: "Back to contacts" },
@@ -269,7 +269,7 @@ export function contactsReply(db: DatabaseSync, key: Buffer, account: string, in
     draft.stage = "address";
     save(draft);
     return text(
-      `Enter ${name}’s 0x wallet address on Robinhood Chain testnet.${draft.address ? "\nCurrent address: " + draft.address + "\nSend Keep to use the current address." : ""}`,
+      `Enter ${name}’s 0x wallet address for Robinhood mainnet.${draft.address ? "\nCurrent address: " + draft.address + "\nSend Keep to use the current address." : ""}`,
     );
   }
   if (draft.stage === "address") {
@@ -280,14 +280,17 @@ export function contactsReply(db: DatabaseSync, key: Buffer, account: string, in
       address === zeroAddress ||
       address.toLowerCase() === "0x13800afeea6f8688547770052b395099758d9a5b"
     )
-      return text("Use the recipient’s wallet address, not the zero address or Demo USD contract.");
+      return text("Use the recipient’s wallet address, not the zero address or token contract.");
     draft.address = address;
     draft.stage = "review";
     save(draft);
-    return buttons(`Save contact?\n\n${draft.name}\n${address}\n\nRobinhood Chain testnet`, [
-      { id: "contact:confirm:" + draft.token, title: "Save contact" },
-      { id: "contact:cancel:" + draft.token, title: "Cancel" },
-    ]);
+    return buttons(
+      `Save contact?\n\n${draft.name}\n${address}\n\nVerify the recipient address on Robinhood mainnet`,
+      [
+        { id: "contact:confirm:" + draft.token, title: "Save contact" },
+        { id: "contact:cancel:" + draft.token, title: "Cancel" },
+      ],
+    );
   }
   return text("Use the Save/Delete or Cancel buttons above, or type Cancel to stop.");
 }

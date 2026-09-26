@@ -1,3 +1,5 @@
+import { mainnetAction } from "../src/server/whatsapp/mainnet-payments";
+import { processMainnetTrade } from "../src/server/stocks/mainnet-runner";
 import { setDefaultAutoSelectFamilyAttemptTimeout } from "node:net";
 import { setDefaultResultOrder } from "node:dns";
 import { assistantReply, purgeAssistantMemory } from "../src/server/whatsapp/assistant";
@@ -8,6 +10,8 @@ import {
   unseal,
   whatsappConfig,
   senderLookup,
+  senderAllowed,
+  senderKeyAccess,
 } from "../src/server/whatsapp/config";
 import { processPayment, reviewPayment } from "../src/server/whatsapp/payment-runner";
 import { balanceReply } from "../src/server/whatsapp/balance";
@@ -68,19 +72,33 @@ async function main() {
   const delivery = deliveryConfig();
   const store = new WhatsAppStore(config.key);
   const paymentTyping = new Map<string, () => void>();
-  const allowedSenders = new Set(
-    [...config.allowed].map((phone) => senderLookup(phone, config.key)),
-  );
-  const refreshPaymentTyping = () => {
+  const canProcessSender = senderKeyAccess(config.allowed, config.key, config.publicAccess);
+  const refreshPaymentTyping = (restartSender?: string) => {
     const rows = store.db
       .prepare(
         `SELECT p.id,p.sender,t.message_id FROM wa_payments p
       JOIN wa_payment_typing t ON t.payment_id=p.id JOIN wa_accounts a ON a.id=p.account_id
       WHERE p.state IN ('queued','preflight','submitting','unknown','broadcast')
-      AND a.status='active' AND p.confirmed_at>?`,
+      AND a.status='active' AND p.confirmed_at>?
+      UNION ALL
+      SELECT 'stock:' || o.id AS id,o.sender,o.confirmation_message AS message_id
+      FROM wa_mainnet_orders o JOIN wa_accounts a ON a.id=o.account_id
+      WHERE o.state IN ('queued','running','unknown') AND a.status='active'
+      AND o.confirmation_message IS NOT NULL AND o.confirmed_at>?`,
       )
-      .all(Date.now() - 180000) as { id: string; sender: string; message_id: string }[];
-    const active = new Set(rows.filter((r) => allowedSenders.has(r.sender)).map((r) => r.id));
+      .all(Date.now() - 180000, Date.now() - 180000) as {
+      id: string;
+      sender: string;
+      message_id: string;
+    }[];
+    // Sending a chat message clears Meta's typing indicator. Restart only the
+    // same sender's active operations after delivering an acknowledgement.
+    for (const row of rows)
+      if (row.sender === restartSender) {
+        paymentTyping.get(row.id)?.();
+        paymentTyping.delete(row.id);
+      }
+    const active = new Set(rows.filter((r) => canProcessSender(r.sender)).map((r) => r.id));
     for (const [id, stop] of paymentTyping)
       if (!active.has(id)) {
         stop();
@@ -104,10 +122,9 @@ async function main() {
   process.on("SIGTERM", () => {
     running = false;
   });
+  console.log(`WhatsApp worker started (${config.publicAccess ? "public" : "allowlist"} access).`);
   console.log(
-    process.env.WHATSAPP_PAYMENTS_ENABLED === "true"
-      ? "WhatsApp worker started (confirmed testnet payments enabled)."
-      : "WhatsApp worker started (payment review enabled; sending disabled).",
+    `Mainnet execution: ${process.env.MAINNET_STOCK_TRADING_ENABLED === "true" ? "enabled" : "disabled"}.`,
   );
   try {
     do {
@@ -119,7 +136,7 @@ async function main() {
         let stopTyping: (() => void) | undefined;
         try {
           let payload = unseal<{ to: string } & Record<string, unknown>>(job.payload, config.key);
-          if (!config.allowed.has(payload.to)) {
+          if (!senderAllowed(config.allowed, payload.to, config.publicAccess)) {
             store.finish(job.id, "blocked", null, "sender_removed");
             continue;
           }
@@ -148,6 +165,23 @@ async function main() {
                 payload.to,
                 payload.input,
                 payload.message_id,
+              )),
+            };
+            store.db
+              .prepare("UPDATE wa_outbox SET payload=? WHERE id=? AND state='sending'")
+              .run(seal(payload, config.key), job.id);
+          }
+          if (payload._steward_type === "mainnet_action" && typeof payload.action === "string") {
+            payload = {
+              to: payload.to,
+              ...(await mainnetAction(
+                store.db,
+                config.key,
+                payload.to,
+                job.id,
+                payload.action,
+                typeof payload.recipient === "string" ? payload.recipient : undefined,
+                typeof payload.amount === "string" ? payload.amount : undefined,
               )),
             };
             store.db
@@ -215,6 +249,7 @@ async function main() {
               messages?: { id?: string }[];
             };
             const id = body.messages?.[0]?.id;
+            if (id && !typing) refreshPaymentTyping(senderLookup(payload.to, config.key));
             store.finish(
               job.id,
               id || (typing && body.success === true) ? "accepted" : "unknown",
@@ -247,8 +282,9 @@ async function main() {
           stopTyping?.();
         }
       }
-      await provisionWallet(store.db, config.allowed, config.key);
-      await processPayment(store.db, config.key, config.allowed);
+      await provisionWallet(store.db, config.allowed, config.key, config.publicAccess);
+      await processPayment(store.db, config.key, config.allowed, config.publicAccess);
+      await processMainnetTrade(store.db, config.key, config.allowed, config.publicAccess);
       refreshPaymentTyping();
       if (process.argv.includes("--once")) break;
       await sleep(job ? 100 : 1000);

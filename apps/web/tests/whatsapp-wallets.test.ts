@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { migrateAccounts, accountReply } from "../src/server/whatsapp/accounts";
 import { senderLookup } from "../src/server/whatsapp/config";
 import { provisionWallet } from "../src/server/whatsapp/provision-wallet";
+import { walletSetupReply } from "../src/server/whatsapp/wallet-setup";
 
 const key = Buffer.alloc(32, 7),
   phone = "15550001111";
@@ -74,8 +75,21 @@ function message(input: string, from = phone): any {
     throw e;
   }
 }
+function testWalletReply(): any {
+  // These tests cover the legacy testnet provisioner. My account now routes to
+  // mainnet, so obtain the legacy consent offer directly from its handler.
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const reply = walletSetupReply(db, senderLookup(phone, key), id, "setup", randomUUID());
+    db.exec("COMMIT");
+    return reply;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
 function offer() {
-  return message("My account").interactive.action.buttons[0].reply.id as string;
+  return testWalletReply().interactive.action.buttons[0].reply.id as string;
 }
 function queue() {
   message(offer());
@@ -121,9 +135,13 @@ test("duplicate confirmation queues and creates exactly one wallet", async () =>
   assert.equal(postCount, 1);
   assert.equal(count("wa_managed_wallets"), 1);
   assert.equal(job().state, "ready");
-  assert.match(message("My account").text.body, /0x111111/);
-  assert.match(message("Receive payment").text.body, /0x111111/);
-  assert.equal(message("/menu").interactive.action.sections[0].rows[0].title, "My account");
+  assert.match(testWalletReply().text.body, /0x111111/);
+  assert.match(testWalletReply().text.body, /Robinhood Chain testnet/);
+  for (const command of ["My account", "Receive payment"]) {
+    assert.deepEqual(message(command), { _steward_type: "mainnet_action", action: "receive" });
+  }
+  const rows = message("/menu").interactive.action.sections[0].rows;
+  assert.equal(rows.find((row: { id: string }) => row.id === "menu:create").title, "My account");
 });
 test("disabled creation, paused accounts and removed senders do not provision", async () => {
   queue();

@@ -1,3 +1,7 @@
+import { migrateMainnetPayments, mainnetPaymentEntry } from "./mainnet-payments";
+import { migrateMainnetOrders, mainnetConfirmationReply } from "../stocks/mainnet-orders";
+import { migrateStockOrders, stockConfirmationReply } from "../stocks/orders";
+import { migrateStockQuotes } from "../stocks/quote-store";
 import { migratePaymentLanguage, paymentLanguageReply } from "./payment-language";
 import { migrateAssistant, assistantRoute, assistantSession } from "./assistant";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
@@ -6,13 +10,13 @@ import { migratePhoneRecipients, phoneSettings } from "./phone-recipients";
 import { migrateContacts, contactsReply } from "./contacts";
 import { migratePayments, paymentReply } from "./payments";
 import { senderLookup } from "./config";
-import { actionFor, menu, text } from "./menu";
+import { actionFor, menu, text, onboardingWelcome } from "./menu";
 import { migrateWalletSetup, walletSetupReply, walletAddress, readyAccount } from "./wallet-setup";
 
 // Version the exact disclosure so later custody changes require fresh consent.
-export const CONSENT_VERSION = "steward-test-account-v1";
+export const CONSENT_VERSION = "steward-account-v2";
 export const DISCLOSURE =
-  "Create a Steward test account\n\nSteward will control your wallet and authorize only payments you confirm. This prototype uses Robinhood Chain testnet and Demo USD, which has no monetary value. Control of this WhatsApp account gives access to your Steward account.\n\nWallet setup is still pending. Continuing creates your test account and records your consent; it does not create or fund a wallet yet. Phone-number recipient lookup is off until you choose to enable it.\n\nThis choice expires in 10 minutes.";
+  "Create a Steward account\n\nSteward controls your wallet and authorizes only transactions you confirm. Mainnet USDG payments and stock trades use real assets. Testnet Demo USD is for practice. Control of this WhatsApp account gives access to your Steward account.\n\nContinuing creates your account and requests a dedicated mainnet wallet. No funds are added. Phone-number recipient lookup is off until you choose to enable it.\n\nThis choice expires in 10 minutes.";
 type Account = { id: string; status: string; wallet_state: string };
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 export function migrateAccounts(db: DatabaseSync) {
@@ -39,6 +43,10 @@ export function migrateAccounts(db: DatabaseSync) {
   migratePhoneRecipients(db);
   migrateAssistant(db);
   migratePaymentLanguage(db);
+  migrateStockQuotes(db);
+  migrateStockOrders(db);
+  migrateMainnetOrders(db);
+  migrateMainnetPayments(db);
 }
 // Invoked inside the inbox/outbox transaction; account creation, consuming consent and
 // enqueueing its reply succeed together. No provider/network work belongs in this function.
@@ -55,6 +63,47 @@ export function accountReply(
   if (account && account.status !== "active")
     return text(
       "This account is paused. Contact the Steward operator for recovery. No wallet action was performed.",
+    );
+  const mainnetDraft =
+    account &&
+    db
+      .prepare("SELECT account_id FROM wa_mainnet_payment_drafts WHERE account_id=? AND expires>?")
+      .get(account.id, Date.now());
+  const shortcut = (mainnetDraft || (account && assistantSession(db, account.id))) && /^\d+$/.test(command) ? undefined : actionFor(command);
+  if (account && !shortcut && !message.input.includes(":")) {
+    const draft = mainnetPaymentEntry(db, key, account.id, message.input);
+    if (draft && !["menu", "cancel"].includes(command)) return draft;
+  }
+  if (
+    account &&
+    shortcut &&
+    ["send", "receive", "balance", "history"].includes(shortcut) &&
+    !(assistantSession(db, account.id) && /^\d+$/.test(command))
+  ) {
+    assistantRoute(db, account.id, "Menu", message.id);
+    db.prepare("DELETE FROM wa_payment_sessions WHERE account_id=?").run(account.id);
+    db.prepare("DELETE FROM wa_payment_language_entries WHERE account_id=?").run(account.id);
+    db.prepare("DELETE FROM wa_mainnet_payment_drafts WHERE account_id=?").run(account.id);
+    if (shortcut === "send") return mainnetPaymentEntry(db, key, account.id, message.input, true);
+    return { _steward_type: "mainnet_action", action: shortcut };
+  }
+  if (account && shortcut === "create")
+    return { _steward_type: "mainnet_action", action: "receive" };
+  // Confirmation payloads must never pass through natural-language parsing.
+  if (message.input.startsWith("mainstock:"))
+    return account
+      ? mainnetConfirmationReply(db, key, account.id, message.input, message.id)
+      : text("Create your account first.");
+  if (message.input.startsWith("stock:"))
+    return account
+      ? stockConfirmationReply(db, key, account.id, message.input, message.id)
+      : text("Create your Steward account first. Nothing was submitted.");
+  if (message.input.startsWith("pay:"))
+    return paymentReply(db, key, message) ?? text("Create your wallet first. Type Menu to begin.");
+  if (["recent", "recent activity", "activity", "history"].includes(command))
+    return (
+      paymentReply(db, key, { ...message, input: "Recent activity" }) ??
+      text("Create your wallet first to view payment activity.")
     );
   const inChat = account && assistantSession(db, account.id);
   const paymentEntry =
@@ -106,9 +155,16 @@ export function accountReply(
   }
   const contact = account && contactsReply(db, key, account.id, message.input);
   if (contact) return contact;
-  const naturalPayment = account && paymentLanguageReply(db, key, account.id, message);
+  const naturalPayment =
+    account &&
+    /\b(?:testnet|demo\s*usd|dusd|46630)\b/i.test(message.input) &&
+    paymentLanguageReply(db, key, account.id, message);
   if (naturalPayment) return naturalPayment;
-  const payment = paymentReply(db, key, message);
+  const payment =
+    /^(?:pay|paycontact):/.test(message.input) ||
+    /\b(?:testnet|demo\s*usd|dusd|46630)\b/i.test(message.input)
+      ? paymentReply(db, key, message)
+      : null;
   if (payment) return payment;
   if (message.input.startsWith("walletsetup:")) {
     return account
@@ -136,9 +192,11 @@ export function accountReply(
     ).run(Date.now(), action, digest(token));
     if (action === "cancel")
       return text("Account setup cancelled. No wallet was created. Type Menu to return.");
+    let accountId = account?.id;
     if (!account) {
       const id = randomUUID(),
         now = Date.now();
+      accountId = id;
       db.prepare(
         "INSERT INTO wa_accounts(id,sender,consent_version,consent_at,consent_message_id,created) VALUES(?,?,?,?,?,?)",
       ).run(id, sender, CONSENT_VERSION, now, message.id, now);
@@ -146,16 +204,15 @@ export function accountReply(
         "INSERT INTO wa_wallet_requests(account_id,external_id,idempotency_key,chain,created) VALUES(?,?,?,?,?)",
       ).run(id, "steward_" + id, randomUUID(), 46630, now);
     }
-    return text(
-      "Your Steward test account is created. Wallet setup is pending; no wallet address or test funds are available yet. Type Menu to return, or choose My account to check setup status.",
-    );
+    // The accepted account disclosure covers the dedicated mainnet wallet.
+    return { _steward_type: "mainnet_action", action: "receive" };
   }
   const action = actionFor(command);
   if (
     action === "create" ||
     ["my account", "menu:account", "account", "can i see the account"].includes(command)
   ) {
-    if (account) return walletSetupReply(db, sender, account.id, message.input, message.id);
+    if (account) return { _steward_type: "mainnet_action", action: "receive" };
     // Invalidate older offers so only the newest account consent can be used.
     db.prepare(
       "UPDATE wa_account_consents SET consumed=?,outcome='superseded' WHERE sender=? AND consumed IS NULL",
@@ -173,7 +230,7 @@ export function accountReply(
           buttons: [
             {
               type: "reply",
-              reply: { id: "enroll:accept:" + token, title: "Create test account" },
+              reply: { id: "enroll:accept:" + token, title: "Create account" },
             },
             { type: "reply", reply: { id: "enroll:cancel:" + token, title: "Cancel" } },
           ],
@@ -181,7 +238,12 @@ export function accountReply(
       },
     };
   }
-  if (["hi", "hello", "menu", "start"].includes(command)) return menu(!!account);
+  if (command === "menu") return menu(!!account);
+  if (["hi", "hello", "start"].includes(command)) {
+    if (!account) return onboardingWelcome();
+
+    return assistantRoute(db, account.id, "Ask Steward", message.id);
+  }
   if (action && ["balance", "send", "receive", "history", "contacts"].includes(action)) {
     const wallet = account && walletAddress(db, account.id);
     if (wallet && action === "balance") return { _steward_type: "balance" };
@@ -199,6 +261,12 @@ export function accountReply(
   }
   const chat = account && assistantRoute(db, account.id, message.input, message.id);
   if (chat) return chat;
-  if (account && !action) return assistantRoute(db, account.id, "Ask Steward", message.id);
+  if (account && !action) {
+    // Start the session, then handle the actual message instead of discarding it.
+    const started = assistantRoute(db, account.id, "Ask Steward", message.id);
+    if (!assistantSession(db, account.id)) return started;
+    return assistantRoute(db, account.id, message.input, message.id) ?? started;
+  }
+  if (!account && !action) return onboardingWelcome();
   return action || command === "help" ? null : menu(!!account);
 }
