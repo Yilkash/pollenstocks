@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.git/
+.data/
+.env*
+.mainnet-policy-setup.json
+*.sqlite*
+*.db
+*.db-wal
+*.db-shm
+*.log
+*.tsbuildinfo
+test-results/
+playwright-report/

@@ -16,7 +16,9 @@
     "test": "tsx --test tests/*.test.ts",
     "test:browser": "playwright test",
     "whatsapp:worker": "node --env-file=.env.local --import tsx scripts/whatsapp-worker.ts",
-    "whatsapp:setup": "node scripts/whatsapp-setup.mjs"
+    "whatsapp:setup": "node scripts/whatsapp-setup.mjs",
+    "whatsapp:worker:production": "node --import tsx scripts/whatsapp-worker.ts",
+    "start:production": "node scripts/start-production.mjs"
   },
   "dependencies": {
     "@privy-io/node": "^0.35.0",
@@ -25,6 +27,7 @@
     "qrcode.react": "^4.2.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "tsx": "^4.23.15",
     "viem": "2.56.8",
     "zod": "4.6.5"
   },
@@ -34,7 +37,6 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "prettier": "3.6.2",
-    "tsx": "^4.23.15",
     "typescript": "^5.9.0"
   }
 }

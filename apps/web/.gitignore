@@ -7,3 +7,6 @@ node_modules/
 playwright-report/
 test-results/
 next-env.d.ts
+
+# Local mainnet setup recovery record
+.mainnet-policy-setup.json

@@ -1,0 +1,34 @@
+services:
+  app:
+    build:
+      context: ../apps/web
+    restart: unless-stopped
+    env_file: ${STEWARD_ENV_FILE:-.env.hosting}
+    environment:
+      APP_ORIGIN: https://${STEWARD_DOMAIN:?Set STEWARD_DOMAIN}
+      APP_CHAIN_ID: "46630"
+      DATABASE_PATH: /app/.data/steward.sqlite
+    volumes:
+      - steward_data:/app/.data
+    expose:
+      - "3000"
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      STEWARD_DOMAIN: ${STEWARD_DOMAIN:?Set STEWARD_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+volumes:
+  steward_data:
+  caddy_data:
+  caddy_config:
