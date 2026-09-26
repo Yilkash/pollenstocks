@@ -9,7 +9,7 @@ Built for the **OpenServ SERV Hackathon, Edition 01 — Mainnet & MCP track**.
 |              |                                                                                 |
 | ------------ | ------------------------------------------------------------------------------- |
 | Live web app | https://stewardopenserve.up.railway.app                                         |
-| WhatsApp     | `https://wa.me/<YOUR_NUMBER>` ← replace with the production number              |
+| WhatsApp     | [+234 805 106 4171](https://wa.me/2348051064171?text=Hi)                        |
 | Network      | Robinhood Chain mainnet (4663) and testnet (46630)                              |
 | AI           | SERV Reasoning (`inference-api.openserv.ai`) with tool calling and prompt guard |
 
