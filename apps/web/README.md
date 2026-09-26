@@ -19,7 +19,7 @@ This is an implementation milestone, not a verified live deployment. The product
 Use Node.js 24 or newer.
 
 ```bash
-cd openserv-serv-hackathon/apps/web
+cd apps/web
 npm ci
 cp .env.example .env.local
 npm run dev
@@ -43,7 +43,7 @@ Without a token address, the interface renders but payments are unavailable. Wit
 
 ## Deploy the test token
 
-From `openserv-serv-hackathon/contracts`, use a Foundry keystore account funded with **test ETH on chain 46630**. Import/configure the keystore using Foundry locally; do not put a private key in frontend configuration.
+From `contracts`, use a Foundry keystore account funded with **test ETH on chain 46630**. Import/configure the keystore using Foundry locally; do not put a private key in frontend configuration.
 
 ```bash
 forge script script/DeployPaymentToken.s.sol:DeployPaymentToken \

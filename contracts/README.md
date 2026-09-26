@@ -4,16 +4,16 @@
 
 ## Dependencies and compilation
 
-From the repository root, initialize the shared pinned dependencies:
+From the repository root, initialize the pinned dependencies:
 
 ```bash
 git submodule update --init --recursive
-cd openserv-serv-hackathon/contracts
+cd contracts
 forge build --skip test
 forge fmt --check
 ```
 
-The contract package uses Solidity 0.8.28 and remappings to `../../lib`. The workspace root also provides a compatible Foundry configuration.
+The contract package uses Solidity 0.8.28 and remappings to `../lib`.
 
 ## Deploy to testnet
 

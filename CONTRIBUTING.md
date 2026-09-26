@@ -40,7 +40,7 @@ Use small commits with a clear scope and purpose, for example:
 - `refactor(web): separate payment UI and request handlers`
 - `docs(steward): describe deployment and recovery limits`
 
-Review staged paths before committing. This is a shared hackathon repository, so do not include sibling project changes in a Steward Pay commit. Update CHANGELOG.md for meaningful milestones.
+Review staged paths before committing. Update CHANGELOG.md for meaningful milestones.
 
 ## Local configuration
 

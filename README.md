@@ -79,7 +79,9 @@ These were executed through Steward on Robinhood Chain mainnet and can be checke
 ## Repository layout
 
 ```text
-openserv-serv-hackathon/
+steward/
+├── .github/workflows/ # CI: formatting, tests, build, browser and contract tests
+├── lib/               # forge-std and OpenZeppelin (Git submodules)
 ├── apps/web/          # Next.js app, WhatsApp webhook and workers, SERV integration
 │   ├── src/server/whatsapp/   # Assistant, menus, payments, wallets, consent
 │   ├── src/server/stocks/     # Quotes, routes, reviews, mainnet runner, receipts
@@ -96,7 +98,7 @@ Requirements: Node.js 24+, npm and Foundry. Mainnet and WhatsApp features also n
 
 ```bash
 git submodule update --init --recursive
-cd openserv-serv-hackathon/apps/web
+cd apps/web
 npm ci
 cp .env.example .env.local   # fill in your own keys; never commit this file
 npm run dev                  # web app on http://localhost:3000
@@ -108,7 +110,7 @@ Every variable is documented in `apps/web/.env.example`. Mainnet trading stays o
 ## Tests
 
 ```bash
-cd openserv-serv-hackathon/apps/web
+cd apps/web
 npm test               # 101 Node tests
 npm run typecheck
 npm run build

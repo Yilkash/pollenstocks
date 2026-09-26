@@ -1,0 +1,21 @@
+# Foundry build output and local broadcast records
+cache/
+out/
+broadcast/
+
+# Dependencies and generated web output
+node_modules/
+.next/
+*.tsbuildinfo
+
+# Local configuration and application data
+.env*
+!.env.example
+.data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Editor and OS files
+.DS_Store
+*.log
