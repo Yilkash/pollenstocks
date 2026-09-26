@@ -1,21 +1,69 @@
+import { mainnetStockMentions } from "../stocks/stock-language";
+import { mainnetPaymentReview } from "./mainnet-payments";
+import { mainnetWallet } from "../stocks/mainnet-orders";
+import { mainnetRpc } from "../stocks/mainnet-trade";
+import { erc20Abi, formatEther } from "viem";
+import { MAINNET_USDG } from "../networks/robinhood";
+import { mainnetTradeReviewReply, mainnetTradeStatusReply } from "../stocks/mainnet-orders";
+import { normalizePhone } from "./phone-recipients";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
-import { isAddress, parseUnits } from "viem";
+import { isAddress, parseUnits, zeroAddress } from "viem";
 import { seal, unseal } from "./config";
 import { text, actionFor } from "./menu";
 import { balanceReply } from "./balance";
-import { paymentReply } from "./payments";
+import { paymentReply, activePaymentReply, PAYMENT_TOKEN, type Payment } from "./payments";
 import { reviewPayment } from "./payment-runner";
 import { contactsReply, contactByName, contactList } from "./contacts";
 import { readyAccount, walletAddress } from "./wallet-setup";
 
+import { MAINNET_ASSETS } from "../networks/robinhood";
+import {
+  mainnetStockListReply,
+  mainnetPortfolioReply,
+  mainnetPriceReply,
+  mainnetReceiveReply,
+  mainnetReferencePriceReply,
+  mainnetTradingMessage,
+} from "./mainnet-stocks";
+import { mainnetReferencePrice, referenceDollars } from "../stocks/reference-price";
+import { formatUnits } from "viem";
+import { STOCKS, type StockSymbol } from "../stocks/market";
+import { stockListReply, stockPortfolioReply, stockQuoteReply } from "./stocks";
+
 type Task = {
-  kind: "payment" | "contact";
+  kind: "payment" | "contact" | "stock" | "mainnet_stock" | "mainnet_payment";
+  desiredQuantity?: string;
+  priceScope?: "all" | "AAPL" | "NVDA" | "TSLA";
+  mainnetSymbol?: "AAPL" | "NVDA" | "TSLA";
+  symbol?: StockSymbol;
+  side?: "buy" | "sell";
+  unit?: string;
   recipient?: string;
   amount?: string;
   name?: string;
   address?: string;
 };
+// Only continue a saved read-only price request. Never repeat a trade from “retry”.
+export function referencePriceFollowup(
+  task: Task | null,
+  input: string,
+): { symbol?: "AAPL" | "NVDA" | "TSLA" } | null {
+  if (task?.kind !== "mainnet_stock" || !task.priceScope) return null;
+  const command = input
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?]+$/, "");
+  if (
+    /^(?:all|all of them|all three|all 3|all stocks|all prices|all their prices)(?: please)?$/.test(
+      command,
+    )
+  )
+    return {};
+  if (/^(?:please )?(?:try again|retry|again|refresh|refresh prices)(?: please)?$/.test(command))
+    return task.priceScope === "all" ? {} : { symbol: task.priceScope };
+  return null;
+}
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const field = z.string().trim().min(1).max(100);
 const amountField = z.string().regex(/^(?:0|[1-9]\d{0,3})(?:\.\d{1,6})?$/);
@@ -33,20 +81,95 @@ const tool = (
   },
 });
 export const assistantTools = [
-  tool("get_balance", "Read actual Demo USD and test ETH balances."),
+  tool(
+    "get_mainnet_receive_address",
+    "Show the authenticated user's Robinhood mainnet funding address for USDG and ETH. Provisions the first wallet only if missing; otherwise reuses the existing wallet. One mainnet wallet per account: cannot create another wallet or change the address. Use only when the user requests their address, funding or deposit instructions, not for complaints, explanations, or second-wallet requests; mainnet is the default. Never accepts an address or account argument. Does not trade or transfer funds.",
+  ),
+  tool(
+    "get_mainnet_trade_status",
+    "Read mainnet stock trade reviews, approval progress and confirmed swap receipts. Use for stock trade status, never payment history.",
+  ),
+  tool(
+    "prepare_mainnet_stock_trade",
+    "Prepare a mainnet stock trade review only when the user asks to buy/sell, not for informational prices, examples or previews. Stocks default to mainnet. Requires stock, direction and input amount; omitted buy currency means USDG. Buys are limited to 1,000 USDG and sells to 1,000 stock tokens per trade. Never reduce or split a larger request automatically. Reuse the current mainnet stock task. Omit missing fields. Sells return USDG; interpret “sell 0.001 Apple shares” as 0.001 AAPL stock tokens. Never reuse a buy budget as a sell quantity. Never executes; a separate confirmation button is mandatory. Setup may be unavailable.",
+    {
+      symbol: { type: "string", enum: ["AAPL", "NVDA", "TSLA"] },
+      side: { type: "string", enum: ["buy", "sell"] },
+      amount: { type: "string" },
+      unit: { type: "string" },
+    },
+  ),
+  tool(
+    "stock_help",
+    "Show Steward's supported stock catalogue and explain price previews versus execution. Use for general stock/share/equity availability or capabilities, including misspellings, without requiring a network or amount. For a specific unsupported company, answer directly that it is unsupported rather than calling this tool. For a purchase request, collect the stock and budget with the trade preparation tool. This is the configured catalogue, not a live tradability check.",
+  ),
+  tool(
+    "list_mainnet_stocks",
+    "Verify and list official AAPL, NVDA, TSLA mainnet addresses. Read-only catalogue.",
+  ),
+  tool(
+    "get_mainnet_stock_portfolio",
+    "Read mainnet holdings at the user's existing Steward address, defaulting to mainnet unless testnet is explicitly requested. Does not activate a mainnet wallet.",
+  ),
+  tool(
+    "preview_mainnet_stock_price",
+    "Read an indicative KyberSwap mainnet price. Default network is mainnet. Omitted buy currency means USDG; sells use stock-token quantity. Reuse the current task for preview follow-ups. Explicit other currencies must not be substituted. Omit missing fields so the tool can ask. No order or signing.",
+    {
+      symbol: { type: "string", enum: ["AAPL", "NVDA", "TSLA"] },
+      side: { type: "string", enum: ["buy", "sell"] },
+      amount: { type: "string" },
+      unit: { type: "string" },
+    },
+  ),
+  tool(
+    "get_stock_price",
+    "Show USD reference prices per Robinhood mainnet stock token with a short update age. Preserve older/saved labels. These are not executable USDG trade quotes. For price questions without a budget or direction: Tesla price, show stock prices. Omit symbol to show all supported stocks. Never creates a trade.",
+    { symbol: { type: "string", enum: ["AAPL", "NVDA", "TSLA"] } },
+  ),
+  tool(
+    "list_test_stocks",
+    "List supported test stocks and current read-only capabilities. Trading is disabled.",
+  ),
+  tool(
+    "get_stock_portfolio",
+    "Read actual test-stock and USDG balances in the user's Steward wallet, not their external MetaMask wallet.",
+  ),
+  tool(
+    "quote_stock",
+    "Collect a read-only buy/sell estimate. Omit missing fields; reuse the stock task. Buy input must be explicit USDG budget; sell input must be stock-token quantity. Never convert USD, Demo USD or requested stock output into USDG. No orders or confirmations are created.",
+    {
+      symbol: { type: "string", enum: ["TSLA", "AMD", "NFLX", "AMZN"] },
+      side: { type: "string", enum: ["buy", "sell"] },
+      amount: { type: "string" },
+      unit: {
+        type: "string",
+        description: "User-stated input unit, e.g. USDG, TSLA, USD or Demo USD; omit if unstated.",
+      },
+    },
+  ),
+  tool(
+    "get_balance",
+    "Read mainnet USDG, ETH and stock balances by default. Testnet only when explicitly requested.",
+  ),
   tool(
     "get_recent_payments",
     "Read latest payment statuses and receipts; use for whether a payment went through.",
   ),
-  tool("get_receive_address", "Show the user's own receiving address and testnet."),
-  tool("get_account", "Show account wallet readiness."),
+  tool(
+    "get_receive_address",
+    "Show the user's own Robinhood mainnet receiving address by default. Reuses their wallet; cannot create another or replace it. Not for questions about why the address is unchanged.",
+  ),
+  tool(
+    "get_account",
+    "Show account wallet readiness. Cannot create an additional wallet, replace a wallet or rotate its address. Explain those limitations without a tool.",
+  ),
   tool("list_contacts", "Display the user's saved contacts locally."),
   tool("find_contact", "Look up a saved contact locally by name.", { name: { type: "string" } }, [
     "name",
   ]),
   tool(
     "check_affordability",
-    "Check a Demo USD amount against balance and a conservative fee reserve; never prepares or sends a payment.",
+    "Check a USDG amount against the mainnet balance; fees are checked at review. Explicit testnet requests use Demo USD. Never prepares or sends a payment.",
     { amount: { type: "string" } },
     ["amount"],
   ),
@@ -117,6 +240,11 @@ export async function runAssistantTool(
     paymentReply(db, key, { from: phone, id: messageId, input: value });
   if (
     [
+      "get_mainnet_receive_address",
+      "get_mainnet_trade_status",
+      "stock_help",
+      "list_test_stocks",
+      "get_stock_portfolio",
       "get_balance",
       "get_recent_payments",
       "get_receive_address",
@@ -126,10 +254,37 @@ export async function runAssistantTool(
     ].includes(name)
   ) {
     z.object({}).strict().parse(args);
-    if (name === "get_balance") return balanceReply(db, key, phone);
+    if (name === "get_mainnet_receive_address") {
+      if (/\b(?:testnet|46630)\b/i.test(input))
+        return text("Please choose one network: mainnet or testnet.");
+      return mainnetReceiveReply(db, account);
+    }
+    if (name === "get_mainnet_trade_status") return mainnetTradeStatusReply(db, account);
+    if (name === "stock_help")
+      return text(
+        "Stock tokens on Robinhood mainnet\n\n" +
+          "• Apple (AAPL)\n• NVIDIA (NVDA)\n• Tesla (TSLA)\n\n" +
+          "Buy example: Buy Apple with 0.2 USDG.\n" +
+          "Sell example: Sell 0.001 Apple tokens for USDG.\n" +
+          mainnetTradingMessage(),
+      );
+    if (name === "list_test_stocks") return stockListReply();
+    if (name === "get_stock_portfolio") return stockPortfolioReply(db, account);
+    if (name === "get_balance")
+      return /\b(?:testnet|demo|46630)\b/i.test(input)
+        ? balanceReply(db, key, phone)
+        : mainnetPortfolioReply(db, account);
+    if (name === "get_recent_payments" && !/\b(?:testnet|demo|46630)\b/i.test(input))
+      return mainnetTradeStatusReply(db, account);
     if (name === "get_recent_payments")
       return pay("Recent activity") ?? text("Create your wallet first to see payment activity.");
     if (name === "get_receive_address" || name === "get_account") {
+      if (!/\b(?:testnet|demo|46630)\b/i.test(input)) return mainnetReceiveReply(db, account);
+      if (/\b(?:mainnet|4663)\b/i.test(input)) {
+        if (/\b(?:testnet|46630)\b/i.test(input))
+          return text("Please choose one network: mainnet or testnet.");
+        return mainnetReceiveReply(db, account);
+      }
       const wallet = walletAddress(db, account);
       return wallet
         ? readyAccount(wallet.address)
@@ -138,10 +293,285 @@ export async function runAssistantTool(
           );
     }
     if (name === "list_contacts") return contactList(db, key, account, "manage");
+    db.prepare(
+      "UPDATE wa_mainnet_orders SET state='cancelled',confirmation_hash=NULL WHERE account_id=? AND state='review'",
+    ).run(account);
     clear();
+    db.prepare("DELETE FROM wa_mainnet_payment_drafts WHERE account_id=?").run(account);
     db.prepare("DELETE FROM wa_contact_sessions WHERE account_id=?").run(account);
     db.prepare("DELETE FROM wa_payment_language_entries WHERE account_id=?").run(account);
     return pay("Cancel") ?? text("Draft cancelled. Nothing was sent.");
+  }
+  if (
+    [
+      "list_mainnet_stocks",
+      "get_stock_price",
+      "get_mainnet_stock_portfolio",
+      "preview_mainnet_stock_price",
+      "prepare_mainnet_stock_trade",
+    ].includes(name)
+  ) {
+    if (/\b(?:testnet|46630)\b/i.test(input) && !/\b(?:mainnet|4663)\b/i.test(input))
+      return text(
+        "You asked for testnet. Please request a testnet stock quote or portfolio; I won’t substitute mainnet data.",
+      );
+    if (name === "list_mainnet_stocks") {
+      z.object({}).strict().parse(args);
+      return mainnetStockListReply();
+    }
+    if (name === "get_mainnet_stock_portfolio") {
+      z.object({}).strict().parse(args);
+      return mainnetPortfolioReply(db, account);
+    }
+    // Accept bounded numeric input here; business limits get a useful reply below.
+    // A large amount must not throw into the assistant's generic service-error handler.
+    const parsed = z
+      .object({
+        symbol: z.enum(["AAPL", "NVDA", "TSLA"]).optional(),
+        side: z.enum(["buy", "sell"]).optional(),
+        amount: z.string().max(100).optional(),
+        unit: field.optional(),
+      })
+      .strict()
+      .safeParse(args);
+    if (!parsed.success)
+      return text(
+        "Please specify Apple, NVIDIA or Tesla and a plain numeric amount. Buys support up to 1,000 USDG; sells support up to 1,000 stock tokens per trade.",
+      );
+    const a = parsed.data;
+    const prior = task?.kind === "mainnet_stock" ? task : undefined;
+    const priceFollowup = referencePriceFollowup(task, input);
+    const mentions = mainnetStockMentions(input);
+    const broadPrices =
+      name === "get_stock_price" &&
+      ((/\bprices\b/i.test(input) && mentions.length === 0) ||
+        (priceFollowup !== null && priceFollowup.symbol === undefined));
+    if (mentions.length > 1 && name !== "get_stock_price")
+      return text("Which stock should I use for this request: Apple, NVIDIA or Tesla?");
+    const named = mentions.length === 1 ? mentions[0] : undefined;
+    const symbol = broadPrices ? undefined : (named ?? a.symbol ?? prior?.mainnetSymbol);
+    if (!broadPrices && a.symbol && !mainnetStockMentions(evidence).includes(a.symbol))
+      return text("Which stock: Apple, NVIDIA or Tesla?");
+    if (a.amount && !amountLiteral(a.amount))
+      return text("How much would you like to spend or sell?");
+    const explicitSide = /\bbuy\b/i.test(input)
+      ? "buy"
+      : /\bsell\b/i.test(input)
+        ? "sell"
+        : undefined;
+    const side = explicitSide ?? a.side ?? prior?.side;
+    const changed =
+      prior && ((symbol && symbol !== prior.mainnetSymbol) || (side && side !== prior.side));
+    // A previous buy budget must never become a sell quantity (or vice versa).
+    const draft: Task = {
+      ...(prior ?? {}),
+      kind: "mainnet_stock",
+      mainnetSymbol: symbol,
+      side,
+      desiredQuantity: changed ? undefined : prior?.desiredQuantity,
+      amount: a.amount ?? (changed ? undefined : prior?.amount),
+      unit: a.unit ?? (changed || a.amount ? undefined : prior?.unit),
+    };
+    if (
+      changed &&
+      a.amount &&
+      !new RegExp("(?<![\\p{L}\\p{N}.])" + escape(a.amount) + "(?![\\d.])", "iu").test(input)
+    ) {
+      draft.amount = undefined;
+      draft.unit = undefined;
+    }
+    const quantity =
+      /(?<![\p{L}\p{N}.+-])(\d+(?:\.\d+)?)\s*(?:shares?|tokens?|AAPL|TSLA|NVDA|apple(?:['’]s|s)?|nvidia(?:['’]s|s)?|tesla(?:['’]s|s)?)(?![\p{L}\p{N}])/iu.exec(
+        input,
+      );
+    const budget =
+      /\b(?:with|spend|budget|for)\s+(\d+(?:\.\d+)?)\b|\b(\d+(?:\.\d+)?)\s*USDG\b/i.exec(input);
+    if (quantity && !budget) {
+      draft.desiredQuantity = quantity[1];
+      draft.amount = undefined;
+      draft.unit = "shares";
+    }
+    if (
+      prior?.desiredQuantity &&
+      draft.side === "buy" &&
+      !changed &&
+      /^\d+(?:\.\d+)?$/.test(input.trim())
+    ) {
+      draft.desiredQuantity = undefined;
+      draft.amount = input.trim();
+      draft.unit = "USDG";
+      draft.side = "buy";
+    }
+    if (budget) {
+      draft.desiredQuantity = undefined;
+      draft.amount = budget[1] ?? budget[2];
+      draft.unit = "USDG";
+    }
+    if (name === "get_stock_price") {
+      save({ kind: "mainnet_stock", mainnetSymbol: symbol, priceScope: symbol ?? "all" });
+      return mainnetReferencePriceReply(symbol, priceFollowup !== null);
+    }
+    if (draft.side === "sell" && /\b(?:all|everything|entire|whole)\b/i.test(input)) {
+      draft.amount = undefined;
+      draft.desiredQuantity = undefined;
+      draft.unit = symbol;
+      save(draft);
+      return text(
+        symbol
+          ? `How many ${symbol} tokens would you like to sell? You can ask for your balance first.`
+          : "Which stock would you like to sell: Apple, NVIDIA or Tesla?",
+      );
+    }
+    delete draft.priceScope;
+    if (!draft.unit && draft.side) draft.unit = draft.side === "buy" ? "USDG" : symbol;
+    if (/\b(?:demo\s*usd|dusd|usdc|usdt|dollars?|usd|eth)\b/i.test(input))
+      draft.unit = "unsupported";
+    save(draft);
+    if (!symbol) return text("Which stock: Apple, NVIDIA or Tesla?");
+    if (!draft.side && !draft.amount && name === "preview_mainnet_stock_price")
+      return mainnetReferencePriceReply(symbol);
+    if (draft.desiredQuantity) {
+      if (draft.side === "sell") {
+        draft.amount = draft.desiredQuantity;
+        draft.unit = symbol;
+        draft.desiredQuantity = undefined;
+        save(draft);
+      } else {
+        draft.amount = undefined;
+        save(draft);
+        let value = "";
+        try {
+          const price = await mainnetReferencePrice(symbol);
+          const indicative = (price.value * parseUnits(draft.desiredQuantity, 18)) / 10n ** 18n;
+          const updated = new Date(price.asOf).toISOString().replace("T", " ").slice(0, 16);
+          value = ` Reference value: ≈ ${referenceDollars(indicative, price.decimals)} USD (${price.source}, updated ${updated} UTC${price.cachedFallback ? "; saved price, refresh unavailable" : ""}). This is not a USDG purchase quote.`;
+        } catch {
+          /* Preserve quantity intent even when a public quote is unavailable. */
+        }
+        return text(
+          `You want ${draft.desiredQuantity} ${symbol} tokens.${value}\n\nSteward buys by USDG budget, up to 1,000 USDG per trade. It cannot place an order for an exact token quantity.\n\nHow much USDG would you like to spend?`,
+        );
+      }
+    }
+    if (!draft.side) return text("Would you like to buy or sell?");
+    if (!draft.amount)
+      return text(
+        draft.side === "buy"
+          ? "How much USDG would you like to spend?"
+          : `How many ${symbol} tokens would you like to sell?`,
+      );
+    if (draft.side === "sell" && /^(?:shares?|tokens?)$/i.test(draft.unit ?? "")) {
+      draft.unit = symbol;
+      save(draft);
+    }
+    const expected = draft.side === "buy" ? "USDG" : symbol;
+    if (draft.unit?.toUpperCase() !== expected) return text(`Enter the amount in ${expected}.`);
+    const decimals = draft.side === "buy" ? 6 : 18;
+    const plainAmount = new RegExp(`^(?:0|[1-9]\\d{0,29})(?:\\.\\d{1,${decimals}})?$`).test(
+      draft.amount,
+    );
+    const inputAmount = plainAmount ? parseUnits(draft.amount, decimals) : undefined;
+    if (
+      inputAmount === undefined ||
+      inputAmount <= 0n ||
+      inputAmount > parseUnits("1000", decimals)
+    ) {
+      // Keep stock and direction for a corrected budget, but never reuse the rejected amount.
+      draft.amount = undefined;
+      save(draft);
+      const limit =
+        draft.side === "buy"
+          ? `Steward currently supports up to 1,000 USDG per stock purchase. What USDG budget would you like to use for ${symbol}?`
+          : `Steward currently supports selling up to 1,000 ${symbol} tokens per trade. How many would you like to sell?`;
+      return text(
+        (inputAmount === undefined || inputAmount <= 0n
+          ? `Enter a positive amount with at most ${decimals} decimal places.\n\n`
+          : "") +
+          limit +
+          "\nNo trade was created.",
+      );
+    }
+    if (
+      name === "prepare_mainnet_stock_trade" &&
+      !/\b(?:preview|quote|price|what if|how much|example)\b/i.test(input)
+    )
+      return mainnetTradeReviewReply(
+        db,
+        key,
+        account,
+        phone,
+        messageId,
+        symbol,
+        draft.side,
+        draft.amount,
+      );
+    return mainnetPriceReply(symbol, draft.side, draft.amount);
+  }
+
+  if (name === "quote_stock") {
+    if (/\b(?:mainnet|4663)\b/i.test(input))
+      return text(
+        "This is a testnet quote tool. For mainnet, ask for an AAPL, NVDA or TSLA mainnet price preview in USDG.",
+      );
+    const a = z
+      .object({
+        symbol: z.enum(["TSLA", "AMD", "NFLX", "AMZN"]).optional(),
+        side: z.enum(["buy", "sell"]).optional(),
+        amount: z
+          .string()
+          .regex(/^(?:0|[1-9]\d{0,3})(?:\.\d{1,18})?$/)
+          .optional(),
+        unit: field.optional(),
+      })
+      .strict()
+      .parse(args);
+    if (a.symbol && !literal(a.symbol) && !literal(STOCKS[a.symbol].name))
+      return text("Which test stock do you mean: TSLA, AMD, NFLX or AMZN?");
+    if ((a.amount && !amountLiteral(a.amount)) || (a.unit && !literal(a.unit)))
+      return text(
+        "Please specify the amount and input token, for example ‘Buy Tesla with 2 USDG’.",
+      );
+    const draft: Task = { ...(task?.kind === "stock" ? task : {}), kind: "stock", ...a };
+    // A changed side or stock cannot silently inherit a previous input quantity/unit.
+    if (
+      task?.kind === "stock" &&
+      ((a.side && a.side !== task.side) || (a.symbol && a.symbol !== task.symbol))
+    ) {
+      draft.amount = a.amount;
+      draft.unit = a.unit;
+    }
+    // Require the user to restate units with a changed amount instead of reusing
+    // a prior USDG budget for a newly requested stock-token quantity.
+    if (a.amount && !a.unit) draft.unit = undefined;
+    if (/\b(?:demo\s*usd|dusd|usdc|usdt|dollars?|usd)\b/i.test(input)) {
+      draft.unit = "unsupported";
+    }
+    save(draft);
+    if (!draft.symbol) return text("Which test stock: TSLA, AMD, NFLX or AMZN?");
+    if (!draft.side)
+      return text("Would you like a buy or sell estimate? Trading is not enabled yet.");
+    if (!draft.amount)
+      return text(
+        draft.side === "buy"
+          ? "How much test USDG would you spend? Include USDG with the amount. Demo USD is a different token."
+          : `How many ${draft.symbol} test tokens would you sell? Include ${draft.symbol} with the amount.`,
+      );
+    const expected = draft.side === "buy" ? "USDG" : draft.symbol;
+    if (!draft.unit || draft.unit.toUpperCase() !== expected)
+      return text(
+        `For this ${draft.side} estimate, give the input amount in ${expected}, for example ‘2 ${expected}’. Demo USD and real dollars are not converted automatically. Trading is not enabled yet.`,
+      );
+    const result = await stockQuoteReply(
+      db,
+      key,
+      account,
+      messageId,
+      draft.symbol,
+      draft.side,
+      draft.amount,
+    );
+    clear();
+    return result;
   }
   if (name === "find_contact" || name === "delete_contact") {
     const a = z.object({ name: field }).strict().parse(args);
@@ -149,7 +579,10 @@ export async function runAssistantTool(
     const c = contactByName(db, key, account, a.name);
     if (!c)
       return text("I couldn’t find that saved contact. Check the name or open Manage contacts.");
-    if (name === "find_contact") return text(`${c.name}\n${c.address}\nRobinhood Chain testnet`);
+    if (name === "find_contact")
+      return text(
+        `${c.name}\n${c.address}\nVerify this address on Robinhood mainnet before sending.`,
+      );
     if (!/\b(?:delete|remove|forget)\b/i.test(input))
       return text("To remove a contact, tell me which saved contact you want to delete.");
     clear();
@@ -158,8 +591,22 @@ export async function runAssistantTool(
   if (name === "check_affordability") {
     const a = z.object({ amount: amountField }).strict().parse(args);
     if (!amountLiteral(a.amount) || parseUnits(a.amount, 6) <= 0n)
-      return text("What Demo USD amount would you like me to check?");
-    return balanceReply(db, key, phone, a.amount);
+      return text("What amount would you like me to check?");
+    if (/\b(?:testnet|demo|46630)\b/i.test(input)) return balanceReply(db, key, phone, a.amount);
+    const wallet = mainnetWallet(db, account);
+    if (!wallet) return text("Ask for your receiving address to set up your mainnet wallet.");
+    const [balance, eth] = await Promise.all([
+      mainnetRpc.readContract({
+        address: MAINNET_USDG.address,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [wallet.address as `0x${string}`],
+      }),
+      mainnetRpc.getBalance({ address: wallet.address as `0x${string}` }),
+    ]);
+    return text(
+      `${balance >= parseUnits(a.amount, 6) ? "Your USDG covers" : "Your USDG does not cover"} ${a.amount} USDG.\nBalance: ${formatUnits(balance, 6)} USDG\nGas balance: ${formatEther(eth)} ETH\nFees are checked at review. Nothing sent.`,
+    );
   }
   if (name === "prepare_contact") {
     const a = z.object({ name: field.optional(), address: field.optional() }).strict().parse(args);
@@ -174,7 +621,7 @@ export async function runAssistantTool(
     save(draft);
     if (!draft.name) return text("What name should I save this contact under?");
     if (!draft.address)
-      return text(`What is ${draft.name}’s full 0x wallet address on Robinhood testnet?`);
+      return text(`What is ${draft.name}’s full 0x wallet address on Robinhood mainnet?`);
     if (
       draft.name.length > 24 ||
       !/[\p{L}]/u.test(draft.name) ||
@@ -219,6 +666,33 @@ export async function runAssistantTool(
     .object({ recipient: field.optional(), amount: amountField.optional() })
     .strict()
     .parse(args);
+  if (!/\b(?:testnet|demo\s*usd|dusd|46630)\b/i.test(input) && task?.kind !== "payment") {
+    if ((a.recipient && !literal(a.recipient)) || (a.amount && !amountLiteral(a.amount)))
+      return text("Please give the recipient and exact USDG amount.");
+    if (/\b(?:usdc|usdt|eth|btc|eur|gbp)\b/i.test(input))
+      return text(
+        "Payments support USDG on Robinhood mainnet. What USDG amount would you like to send?",
+      );
+    const draft: Task = {
+      ...(task?.kind === "mainnet_payment" ? task : {}),
+      kind: "mainnet_payment",
+      ...a,
+    };
+    if (
+      task?.kind === "mainnet_payment" &&
+      a.recipient &&
+      a.recipient !== task.recipient &&
+      !a.amount
+    )
+      draft.amount = undefined;
+    save(draft);
+    if (!draft.recipient)
+      return text(
+        "Who should receive USDG? Give a saved name, full international phone number or wallet address.",
+      );
+    if (!draft.amount) return text("How much USDG would you like to send?");
+    return mainnetPaymentReview(db, key, account, phone, messageId, draft.recipient, draft.amount);
+  }
   if (task?.kind !== "payment" && !/\b(?:send|pay|transfer|give)\b/i.test(input))
     return text(
       "Tell me who you want to pay and how much. A payment always needs the Confirm payment button.",
@@ -235,6 +709,31 @@ export async function runAssistantTool(
     return text(
       "Who should receive the Demo USD? Give a saved name, full international phone number or full 0x address.",
     );
+  // Resolve saved names before requesting the amount; keep the user-provided
+  // draft so an address correction does not lose the amount already supplied.
+  const phoneRecipient = normalizePhone(draft.recipient);
+  const directAddress = isAddress(draft.recipient);
+  if (draft.recipient.toLowerCase().startsWith("0x") && !directAddress)
+    return text(
+      "That wallet address is incomplete or invalid. Please send the full 0x address. I’ll keep the other payment details; nothing was sent.",
+    );
+  const contact =
+    !directAddress && !phoneRecipient ? contactByName(db, key, account, draft.recipient) : null;
+  if (!directAddress && !phoneRecipient && !contact)
+    return text(
+      `I don’t have a saved contact named ${draft.recipient}. What is their full 0x wallet address or international phone number?${draft.amount ? ` I’ll keep the amount at ${draft.amount} Demo USD.` : ""}\n\nPhone-number recipients must have enabled lookup. Nothing was sent.`,
+    );
+  const destination = directAddress ? draft.recipient : contact?.address;
+  const ownWallet = walletAddress(db, account);
+  if (
+    destination &&
+    [ownWallet?.address, zeroAddress, PAYMENT_TOKEN].some(
+      (address) => address?.toLowerCase() === destination.toLowerCase(),
+    )
+  )
+    return text(
+      "That recipient points to your own wallet or an unsupported address. Please give a different recipient’s wallet address. Nothing was sent.",
+    );
   if (!draft.amount) return text(`How much Demo USD would you like to send to ${draft.recipient}?`);
   if (
     actionFor(draft.recipient) ||
@@ -247,14 +746,14 @@ export async function runAssistantTool(
   try {
     const active = db
       .prepare(
-        "SELECT id FROM wa_payments WHERE account_id=? AND state IN ('quoting','review','queued','preflight','submitting','unknown','broadcast') AND (expires>? OR state NOT IN ('quoting','review'))",
+        "SELECT * FROM wa_payments WHERE account_id=? AND state IN ('quoting','review','queued','preflight','submitting','unknown','broadcast') AND (expires>? OR state NOT IN ('quoting','review'))",
       )
-      .get(account, Date.now());
+      .get(account, Date.now()) as Payment | undefined;
     if (active) {
-      db.exec("ROLLBACK");
-      return text(
-        "A payment is already in progress. Use its confirmation buttons or ask for its status.",
-      );
+      const reply = activePaymentReply(db, active);
+      clear();
+      db.exec("COMMIT");
+      return reply;
     }
     db.prepare("DELETE FROM wa_payment_sessions WHERE account_id=?").run(account);
     result = pay("Send payment");

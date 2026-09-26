@@ -72,7 +72,7 @@ The initial testnet transfer and SERV balance-tool exchange have been completed.
 - An unresolved signing, submitted or unknown payment blocks another payment from that wallet in this app.
 - If broadcasting succeeded but saving the hash failed, reopen the payment in Activity. The browser retains its hash when local storage is available; otherwise copy it from wallet activity.
 - Recovery accepts only a matching transaction. Never resend solely because the page reports a timeout.
-- Receipt refresh is manual. Automatic replacement/cancellation reconciliation and resolution of a signing attempt with no discoverable hash remain unfinished. Such attempts can currently leave the wallet blocked in the app.
+- Receipt refresh is manual. Same-nonce replacements and cancellations can now be recovered by pasting their wallet transaction hash. Automatic discovery and resolution without a recoverable hash remain unfinished; these attempts stay blocked.
 - Included means the matching transfer is in a chain receipt; it is not a claim of final settlement.
 - History covers this app's payments only. Contacts are personal aliases, not identity verification.
 - Chat text, requested tool results and payment details used by tools may be sent to SERV. Enable the organization data-collection setting required by the hackathon before recording the demo.
@@ -101,3 +101,7 @@ Deployment bytecode is committed in `src/generated/payment-token.json`. After ch
 Run `npm test` for the isolated backend suite. After `npm run build` and `npx playwright install chromium`, run `npm run test:browser` for the fake-wallet browser suite. No real payment is sent by these checks.
 
 For a preview without development hot reloads, run `npm run build` then `npm run start -- --port 3001` with APP_ORIGIN set to `http://127.0.0.1:3001`.
+
+## Hosted deployment
+
+A validated Docker image, HTTPS proxy configuration and persistent-volume Compose setup are in the repository. See [hosting instructions](../../docs/HOSTING.md) and the [demo runbook](../../docs/DEMO.md). No public deployment has been performed.

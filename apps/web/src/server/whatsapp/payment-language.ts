@@ -17,6 +17,9 @@ export function paymentLanguageReply(
   message: { from: string; input: string; id: string; timestamp?: number },
 ) {
   const input = message.input.trim().replace(/^\//, "");
+  // IDs are protocol commands, never natural-language payment requests.
+  if (/^(?:menu|pay|paycontact|contact|phoneprivacy|walletsetup|enroll|servchat):/.test(input))
+    return null;
   const entry = db
     .prepare("SELECT stage,expires FROM wa_payment_sessions WHERE account_id=?")
     .get(account) as { stage: string; expires: number } | undefined;
