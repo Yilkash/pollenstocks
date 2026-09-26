@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { equalSecret, signedBody, whatsappConfig } from "@/server/whatsapp/config";
+import { equalSecret, signedBody, whatsappConfig, senderAllowed } from "@/server/whatsapp/config";
 import { WhatsAppStore, type Incoming } from "@/server/whatsapp/store";
 
 export const runtime = "nodejs";
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
         const m = result.data,
           timestamp = Number(m.timestamp) * 1000;
         if (
-          !config.allowed.has(m.from) ||
+          !senderAllowed(config.allowed, m.from, config.publicAccess) ||
           timestamp > Date.now() + 300_000 ||
           timestamp < Date.now() - 23 * 60 * 60_000
         )

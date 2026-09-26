@@ -12,7 +12,7 @@ import {
   parseEventLogs,
   toHex,
 } from "viem";
-import { seal, unseal, senderLookup } from "./config";
+import { seal, unseal, senderLookup, senderKeyAccess } from "./config";
 import { text } from "./menu";
 import { paymentContactLabel } from "./contacts";
 import {
@@ -184,8 +184,13 @@ function notify(db: DatabaseSync, key: Buffer, p: Payment, kind: string, body: s
 }
 // No automatic resubmission after the durable 'submitting' boundary, including
 // timeouts and process death. Recovery is exclusively by provider reference + receipt.
-export async function processPayment(db: DatabaseSync, key: Buffer, allowed: Set<string>) {
-  const allowedKeys = new Set([...allowed].map((p) => senderLookup(p, key)));
+export async function processPayment(
+  db: DatabaseSync,
+  key: Buffer,
+  allowed: Set<string>,
+  publicAccess = false,
+) {
+  const canProcessSender = senderKeyAccess(allowed, key, publicAccess);
   const now = Date.now(),
     lease = randomUUID();
   let p: Payment | undefined;
@@ -198,7 +203,7 @@ export async function processPayment(db: DatabaseSync, key: Buffer, allowed: Set
       .all(now, now) as Payment[];
     p = rows.find(
       (r) =>
-        allowedKeys.has(r.sender) &&
+        canProcessSender(r.sender) &&
         (!["queued", "preflight"].includes(r.state) ||
           process.env.WHATSAPP_PAYMENTS_ENABLED === "true"),
     );

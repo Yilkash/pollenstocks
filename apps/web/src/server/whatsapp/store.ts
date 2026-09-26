@@ -25,7 +25,7 @@ export class WhatsAppStore {
       for (const message of messages) {
         const sender = senderLookup(message.from, this.key);
         if (this.db.prepare("SELECT id FROM wa_inbox WHERE id=?").get(message.id)) continue;
-        // Bound responses from even an allowed tester; ignored excess messages cannot drain the outbox.
+        // Bound each sender in both allowlist and public modes.
         const count = this.db
           .prepare("SELECT COUNT(*) AS n FROM wa_inbox WHERE sender=? AND received>?")
           .get(sender, Date.now() - 60_000) as { n: number };

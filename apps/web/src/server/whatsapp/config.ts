@@ -18,11 +18,20 @@ export function whatsappConfig() {
     throw new Error("WHATSAPP_DATA_KEY must be 32 random bytes in hex");
   const phoneId = required("WHATSAPP_PHONE_NUMBER_ID");
   const wabaId = required("WHATSAPP_WABA_ID");
+  const accessMode = process.env.WHATSAPP_ACCESS_MODE?.trim() || "allowlist";
+  if (!["allowlist", "public"].includes(accessMode))
+    throw new Error("Invalid WHATSAPP_ACCESS_MODE");
+  const publicAccess = accessMode === "public";
   const allowed = new Set(
-    required("WHATSAPP_ALLOWED_SENDERS")
+    (publicAccess
+      ? process.env.WHATSAPP_ALLOWED_SENDERS || ""
+      : required("WHATSAPP_ALLOWED_SENDERS")
+    )
       .split(",")
-      .map((x) => x.trim()),
+      .map((x) => x.trim())
+      .filter(Boolean),
   );
+  if (!publicAccess && allowed.size === 0) throw new Error("Missing WHATSAPP_ALLOWED_SENDERS");
   if (![phoneId, wabaId, ...allowed].every((x) => /^[0-9]{5,20}$/.test(x)))
     throw new Error("Invalid WhatsApp IDs");
   return {
@@ -30,9 +39,18 @@ export function whatsappConfig() {
     phoneId,
     wabaId,
     allowed,
+    publicAccess,
     secret: required("WHATSAPP_APP_SECRET"),
     verifyToken: required("WHATSAPP_VERIFY_TOKEN"),
   };
+}
+/** Admission only: ownership checks and transaction confirmation still apply. */
+export function senderAllowed(allowed: ReadonlySet<string>, phone: string, publicAccess = false) {
+  return /^[0-9]{5,20}$/.test(phone) && (publicAccess || allowed.has(phone));
+}
+export function senderKeyAccess(allowed: ReadonlySet<string>, key: Buffer, publicAccess = false) {
+  const keys = new Set([...allowed].map((phone) => senderLookup(phone, key)));
+  return (sender: string) => /^[a-f0-9]{64}$/.test(sender) && (publicAccess || keys.has(sender));
 }
 export function deliveryConfig() {
   const version = required("WHATSAPP_GRAPH_VERSION");

@@ -1,10 +1,11 @@
+import { walletReadyChat } from "./assistant";
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { createManagedWallet, getManagedWallet, WalletProviderError } from "../wallets/privy";
-import { senderLookup } from "./config";
+import { senderKeyAccess } from "./config";
 import { queueWalletNotice } from "./wallet-notices";
 import { text } from "./menu";
-import { readyAccount, walletConfiguration, walletSetupEnabled } from "./wallet-setup";
+import { walletConfiguration, walletSetupEnabled } from "./wallet-setup";
 
 type Job = {
   account_id: string;
@@ -18,9 +19,14 @@ type Job = {
 };
 // One job per invocation. Creation is never automatically retried after a possibly
 // submitted request: subsequent attempts only look up the same external ID.
-export async function provisionWallet(db: DatabaseSync, allowed: Set<string>, key: Buffer) {
+export async function provisionWallet(
+  db: DatabaseSync,
+  allowed: Set<string>,
+  key: Buffer,
+  publicAccess = false,
+) {
   if (!walletSetupEnabled()) return;
-  const allowedKeys = new Set([...allowed].map((value) => senderLookup(value, key)));
+  const canProcessSender = senderKeyAccess(allowed, key, publicAccess);
   const lease = randomUUID(),
     now = Date.now();
   let job: Job | undefined;
@@ -36,7 +42,7 @@ export async function provisionWallet(db: DatabaseSync, allowed: Set<string>, ke
       ORDER BY p.consent_at LIMIT 50`,
       )
       .all(now, now) as Job[];
-    job = candidates.find((row) => allowedKeys.has(row.sender));
+    job = candidates.find((row) => canProcessSender(row.sender));
     if (job)
       db.prepare(
         "UPDATE wa_wallet_provisioning SET state='checking',lease=?,lease_until=? WHERE account_id=?",
@@ -116,7 +122,13 @@ export async function provisionWallet(db: DatabaseSync, allowed: Set<string>, ke
         db.prepare(
           "UPDATE wa_wallet_provisioning SET state='ready',lease=NULL,lease_until=NULL,error=NULL WHERE account_id=? AND lease=?",
         ).run(job.account_id, lease);
-        queueWalletNotice(db, key, job.account_id, "ready", readyAccount(wallet.address));
+        queueWalletNotice(
+          db,
+          key,
+          job.account_id,
+          "ready",
+          walletReadyChat(db, job.account_id, wallet.address),
+        );
         db.prepare("UPDATE wa_accounts SET wallet_state='ready' WHERE id=?").run(job.account_id);
         db.prepare("UPDATE wa_wallet_requests SET state='ready' WHERE account_id=?").run(
           job.account_id,
