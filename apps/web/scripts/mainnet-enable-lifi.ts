@@ -50,15 +50,13 @@ async function main() {
     console.log("Verified: one LI.FI same-chain ERC20 swap rule can be added. No changes made.");
     return;
   }
-  await client
-    .policies()
-    .createRule(id, {
-      ...lifiPolicyRule,
-      request_expiry: Date.now() + 30000,
-      authorization_context: {
-        authorization_private_keys: [process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY!],
-      },
-    });
+  await client.policies().createRule(id, {
+    ...lifiPolicyRule,
+    request_expiry: Date.now() + 30000,
+    authorization_context: {
+      authorization_private_keys: [process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY!],
+    },
+  });
   const after = await client.policies().get(id);
   if (canonicalPolicy(after.rules.map((r) => key(r as Rule)).sort()) !== canonicalPolicy(desired))
     throw Error("policy_verify_failed");

@@ -45,7 +45,10 @@ function initialize() {
     if (Object.hasOwn(current, name)) {
       // Append nothing to existing blank account fields; replace only a plain empty value.
       if (!value) continue;
-      const expression = new RegExp(`^(?:export[ \t]+)?${name}[ \t]*=[ \t]*(?:""|'')?[ \t]*(?:#.*)?$`, "m");
+      const expression = new RegExp(
+        `^(?:export[ \t]+)?${name}[ \t]*=[ \t]*(?:""|'')?[ \t]*(?:#.*)?$`,
+        "m",
+      );
       if (!expression.test(updated))
         throw new Error(
           `Set ${name} manually; its existing assignment is not a plain empty value.`,

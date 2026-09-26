@@ -69,7 +69,10 @@ export function accountReply(
     db
       .prepare("SELECT account_id FROM wa_mainnet_payment_drafts WHERE account_id=? AND expires>?")
       .get(account.id, Date.now());
-  const shortcut = (mainnetDraft || (account && assistantSession(db, account.id))) && /^\d+$/.test(command) ? undefined : actionFor(command);
+  const shortcut =
+    (mainnetDraft || (account && assistantSession(db, account.id))) && /^\d+$/.test(command)
+      ? undefined
+      : actionFor(command);
   if (account && !shortcut && !message.input.includes(":")) {
     const draft = mainnetPaymentEntry(db, key, account.id, message.input);
     if (draft && !["menu", "cancel"].includes(command)) return draft;

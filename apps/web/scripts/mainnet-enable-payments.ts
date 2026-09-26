@@ -49,15 +49,13 @@ async function main() {
     );
     return;
   }
-  await client
-    .policies()
-    .createRule(id, {
-      ...missing[0],
-      request_expiry: Date.now() + 30000,
-      authorization_context: {
-        authorization_private_keys: [process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY!],
-      },
-    });
+  await client.policies().createRule(id, {
+    ...missing[0],
+    request_expiry: Date.now() + 30000,
+    authorization_context: {
+      authorization_private_keys: [process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY!],
+    },
+  });
   const after = await client.policies().get(id);
   if (canonical(after.rules.map(key).sort()) !== canonical(wanted.sort()))
     throw Error("policy_verify_failed");
