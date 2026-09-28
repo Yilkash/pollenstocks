@@ -126,7 +126,7 @@ async function setup(page: Page) {
     } else throw new Error("Unexpected API path: " + path);
     await route.fulfill({ json: data });
   });
-  await page.goto("/");
+  await page.goto("/testnet");
   await expect(page.getByRole("button", { name: /Disconnect/ })).toBeVisible();
   return stats;
 }
