@@ -12,8 +12,8 @@ export function publicStats(): PublicStats | null {
   let value: PublicStats | null = null;
   const path = process.env.WHATSAPP_DATABASE_PATH || ".data/whatsapp.sqlite";
   try {
-    if (existsSync(path)) {
-      const db = new DatabaseSync(path, { readOnly: true });
+    if (existsSync(/* turbopackIgnore: true */ path)) {
+      const db = new DatabaseSync(/* turbopackIgnore: true */ path, { readOnly: true });
       try {
         const count = (sql: string) => Number((db.prepare(sql).get() as { n: number }).n);
         value = {

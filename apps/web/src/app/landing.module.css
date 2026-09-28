@@ -58,15 +58,11 @@
   letter-spacing: -0.04em;
 }
 
-.brandIcon {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
+.brandLogo {
+  display: block;
+  width: 34px;
+  height: 34px;
   border-radius: 9px;
-  background: var(--green);
-  color: var(--lime);
-  font-size: 18px;
 }
 
 .dot {

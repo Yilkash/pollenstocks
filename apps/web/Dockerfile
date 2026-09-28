@@ -17,6 +17,7 @@ COPY --from=build /app/package.json /app/package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build --chown=node:node /app/.next ./.next
 COPY --from=build --chown=node:node /app/next.config.mjs ./next.config.mjs
+COPY --from=build --chown=node:node /app/public ./public
 
 COPY --from=build --chown=node:node /app/src ./src
 COPY --from=build --chown=node:node /app/scripts ./scripts

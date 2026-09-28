@@ -95,7 +95,7 @@ export default function Landing() {
     <div className={styles.page}>
       <header className={styles.nav}>
         <a className={styles.brand} href="/">
-          <span className={styles.brandIcon}>s</span>
+          <img className={styles.brandLogo} src="/images/steward-logo.png" alt="" />
           <span>
             steward<span className={styles.dot}>.</span>
           </span>
