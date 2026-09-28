@@ -10,6 +10,7 @@ Buy **Apple, NVIDIA and Tesla** stock tokens with USDG on **Robinhood Chain**, j
 <br/>
 
 [![Chat on WhatsApp](https://img.shields.io/badge/Chat_on_WhatsApp-+234_805_106_4171-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://wa.me/2348051064171?text=Hi)
+[![Website](https://img.shields.io/badge/Website-stewardopenserve.up.railway.app-1F4D3D?style=for-the-badge&logo=googlechrome&logoColor=white)](https://stewardopenserve.up.railway.app)
 
 ![Robinhood Chain](https://img.shields.io/badge/Robinhood_Chain-mainnet_4663-CCFF00?style=flat-square)
 ![SERV Reasoning](https://img.shields.io/badge/AI-SERV_Reasoning-6E56CF?style=flat-square)
@@ -216,9 +217,11 @@ Real trades executed through Steward on Robinhood Chain:
 
 ---
 
-## 🖥️ Web dashboard (testnet demo)
+## 🖥️ Website and testnet demo
 
-WhatsApp is the product. The [web app](https://stewardopenserve.up.railway.app) is a separate **testnet** demo of the same payment engine for browser-wallet users. You connect MetaMask or another injected wallet, ask SERV to prepare a **Demo USD** payment, and approve it in your own wallet. Demo USD is a test token with no monetary value. Stock trading is available on WhatsApp only.
+WhatsApp is the product. The [website](https://stewardopenserve.up.railway.app) introduces it, with live counts of users and confirmed mainnet trades.
+
+The [testnet web demo](https://stewardopenserve.up.railway.app/testnet) runs the same payment engine for browser-wallet users. You connect MetaMask or another injected wallet, ask SERV to prepare a **Demo USD** payment, and approve it in your own wallet. Demo USD is a test token with no monetary value. Stock trading is available on WhatsApp only.
 
 ---
 
@@ -259,7 +262,7 @@ steward/
 │   ├── src/server/whatsapp/   # Ask Steward, menus, payments, wallets, consent
 │   ├── src/server/stocks/     # Quotes, routes, reviews, mainnet runner, receipts
 │   ├── src/server/serv.ts     # Web-chat SERV tool loop
-│   ├── src/app/               # Web dashboard, webhook, privacy pages
+│   ├── src/app/               # Landing page, testnet demo, webhook, privacy pages
 │   └── tests/                 # Node test suite and Playwright browser tests
 ├── contracts/                 # Demo USD token, testnet stock adapter, Foundry tests
 ├── deploy/                    # Docker Compose + Caddy example for self-hosting
