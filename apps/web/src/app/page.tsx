@@ -11,6 +11,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { publicStats } from "@/server/public-stats";
+import { MAINNET_STOCK_SYMBOLS } from "@/server/networks/robinhood";
 import styles from "./landing.module.css";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,8 @@ const examples = [
   "Sell 0.001 Apple shares",
   "Show my mainnet stocks",
   "Send 5 USDG to Ada",
+  "Buy SPY with 2 USDG",
+  "Buy Microsoft with 1 USDG",
   "What are the prices?",
 ];
 
@@ -119,8 +122,8 @@ export default function Landing() {
               Buy stocks by <span className={styles.highlight}>texting</span> on WhatsApp.
             </h1>
             <p className={styles.lead}>
-              Trade Apple, NVIDIA and Tesla stock tokens with USDG, just by chatting. Steward shows
-              you the exact deal, and nothing moves until you tap Confirm.
+              Trade Apple, Tesla, NVIDIA, the S&P 500 and more with USDG, just by chatting. Steward
+              shows you the exact deal, and nothing moves until you tap Confirm.
             </p>
             <div className={styles.ctas}>
               <a className={styles.primary} href={WHATSAPP}>
@@ -168,8 +171,8 @@ export default function Landing() {
             </>
           )}
           <div>
-            <b>3</b>
-            <span>stock tokens: AAPL · NVDA · TSLA</span>
+            <b>{MAINNET_STOCK_SYMBOLS.length}</b>
+            <span>stocks and ETFs, from Apple to the S&amp;P 500</span>
           </div>
           <div>
             <b>24/7</b>
