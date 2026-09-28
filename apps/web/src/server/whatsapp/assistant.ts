@@ -1,3 +1,4 @@
+import { MAINNET_STOCK_SYMBOLS } from "../networks/robinhood";
 import { createHash, randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
@@ -17,6 +18,11 @@ import { chatCompletionRefused, promptGuardResponsesTool, ServRefusal } from "..
 
 const VERSION = "serv-direct-chat-v3";
 const digest = (s: string) => createHash("sha256").update(s).digest("hex");
+// Numbers and tickers that a reworded public reply must preserve exactly.
+const factPattern = new RegExp(
+  `\\d+(?:\\.\\d+)?|\\b(?:USDG|${MAINNET_STOCK_SYMBOLS.join("|")})\\b`,
+  "g",
+);
 export function migrateAssistant(db: DatabaseSync) {
   db.exec(`
  CREATE TABLE IF NOT EXISTS wa_assistant_consents(token_hash TEXT PRIMARY KEY,account_id TEXT NOT NULL,version TEXT NOT NULL,expires INTEGER NOT NULL,consumed INTEGER,outcome TEXT);
@@ -373,8 +379,7 @@ export async function assistantReply(
           const prose = chatCompletionRefused(result)
             ? undefined
             : result.choices?.[0]?.message?.content;
-          const facts = (value: string) =>
-            (value.match(/\d+(?:\.\d+)?|\b(?:USDG|AAPL|TSLA|NVDA)\b/g) ?? []).sort().join("|");
+          const facts = (value: string) => (value.match(factPattern) ?? []).sort().join("|");
           const priceLines = sourceText
             .split("\n")
             .filter((line) =>

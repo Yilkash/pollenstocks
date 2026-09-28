@@ -152,7 +152,12 @@ export async function processMainnetTrade(
           policy.chain_type === "ethereum" &&
           policy.version === "1.0",
       );
-      validateMainnetPolicyRules(policy.rules, p.provider === "lifi");
+      // A sell also needs the approve rule for its stock (added stocks gain it at rollout).
+      validateMainnetPolicyRules(
+        policy.rules,
+        p.provider === "lifi",
+        p.side === "send" ? undefined : p.inputToken,
+      );
       if (planned.kind === "trade") {
         const [allowance, balance] = await Promise.all([
           rpc.readContract({
@@ -446,6 +451,7 @@ export async function processMainnetTrade(
         insufficient_eth_for_network_fee: "The wallet needs more ETH for gas.",
         wallet_setup_changed: "The wallet setup changed.",
         trade_disabled_or_expired: "The review expired or trading was disabled.",
+        stock_not_enabled_for_selling: "Selling this stock is not enabled yet.",
       };
       const code =
         error instanceof Error && error.message in reasons ? error.message : "preflight_failed";

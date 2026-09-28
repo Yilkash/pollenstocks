@@ -1,6 +1,6 @@
 import { LIFI_FUNCTION, LIFI_ROUTER, lifiRouterAbi } from "./lifi-contracts";
 import { KYBER_ROUTER, requireTrade, sameAddress } from "./mainnet-trade";
-import { MAINNET_ASSETS, MAINNET_USDG } from "../networks/robinhood";
+import { MAINNET_ASSETS, MAINNET_USDG, ORIGINAL_MAINNET_STOCKS } from "../networks/robinhood";
 export const lifiPolicyRule = {
   name: "LI.FI same-chain stock swap",
   method: "eth_sendTransaction" as const,
@@ -33,6 +33,58 @@ export const lifiPolicyRule = {
     },
   ],
 };
+const approveAbi = [
+  {
+    type: "function",
+    name: "approve",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+];
+// Same shape as the approve rules in docs/privy-mainnet-policy.json.
+export function stockApproveRule(address: string) {
+  return {
+    name: `Approve ${address}`,
+    method: "eth_sendTransaction" as const,
+    action: "ALLOW" as const,
+    conditions: [
+      {
+        field_source: "ethereum_transaction" as const,
+        field: "chain_id" as const,
+        operator: "eq" as const,
+        value: "4663",
+      },
+      {
+        field_source: "ethereum_transaction" as const,
+        field: "to" as const,
+        operator: "eq" as const,
+        value: address,
+      },
+      {
+        field_source: "ethereum_transaction" as const,
+        field: "value" as const,
+        operator: "eq" as const,
+        value: "0x0",
+      },
+      {
+        field_source: "ethereum_calldata" as const,
+        field: "function_name" as const,
+        operator: "eq" as const,
+        value: "approve",
+        abi: approveAbi,
+      },
+    ],
+  };
+}
+// Approve rules for stocks added after the original policy. Each is optional until the
+// rollout script adds it; selling that stock requires it (see validateMainnetPolicyRules).
+export const addedStockApproveRules = Object.entries(MAINNET_ASSETS)
+  .filter(([symbol]) => !ORIGINAL_MAINNET_STOCKS.includes(symbol as never))
+  .map(([, asset]) => stockApproveRule(asset.address));
 export function canonicalPolicy(x: unknown): string {
   if (Array.isArray(x)) return "[" + x.map(canonicalPolicy).join(",") + "]";
   if (x && typeof x === "object")
@@ -57,19 +109,25 @@ type Rule = {
     abi?: unknown;
   }[];
 };
-export function validateMainnetPolicyRules(rules: Rule[], needsLifi: boolean) {
-  const expected = [
-    ...Object.values(MAINNET_ASSETS).map((a) => [a.address, "approve"]),
+export function validateMainnetPolicyRules(
+  rules: Rule[],
+  needsLifi: boolean,
+  approveToken?: string,
+) {
+  const required = [
+    ...ORIGINAL_MAINNET_STOCKS.map((symbol) => [MAINNET_ASSETS[symbol].address, "approve"]),
     [MAINNET_USDG.address, "approve"],
     [KYBER_ROUTER, "swap"],
     [MAINNET_USDG.address, "transfer"],
   ];
-  // A reviewed Kyber trade remains valid after the narrow LI.FI rule is added.
-  if (rules.length === 7) expected.push([LIFI_ROUTER, LIFI_FUNCTION]);
-  requireTrade(
-    rules.length === expected.length && (!needsLifi || rules.length === 7),
-    "mainnet_policy_mismatch",
-  );
+  // Narrow rules that may be present: the LI.FI router and approvals for added stocks.
+  const optional = [
+    [LIFI_ROUTER, LIFI_FUNCTION],
+    ...Object.entries(MAINNET_ASSETS)
+      .filter(([symbol]) => !ORIGINAL_MAINNET_STOCKS.includes(symbol as never))
+      .map(([, asset]) => [asset.address, "approve"]),
+  ];
+  const expected = [...required, ...optional];
   const seen = new Set<string>();
   for (const rule of rules) {
     requireTrade(
@@ -99,4 +157,11 @@ export function validateMainnetPolicyRules(rules: Rule[], needsLifi: boolean) {
       requireTrade(canonicalPolicy(abi) === canonicalPolicy(lifiPolicyRule.conditions[3].abi));
     }
   }
+  const has = (address: string, name: string) => seen.has(address.toLowerCase() + name);
+  requireTrade(
+    required.every(([address, name]) => has(address, name)) &&
+      (!needsLifi || has(LIFI_ROUTER, LIFI_FUNCTION)),
+    "mainnet_policy_mismatch",
+  );
+  requireTrade(!approveToken || has(approveToken, "approve"), "stock_not_enabled_for_selling");
 }

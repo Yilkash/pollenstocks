@@ -8,11 +8,10 @@ import { referencePriceFollowup } from "../src/server/whatsapp/assistant-tools";
 
 // Entirely offline. Unknown URLs and all non-read RPC methods fail immediately.
 const symbols = Object.keys(MAINNET_ASSETS) as MainnetStock[];
-const feeds = {
-  AAPL: "0x1111111111111111111111111111111111111111",
-  NVDA: "0x2222222222222222222222222222222222222222",
-  TSLA: "0x3333333333333333333333333333333333333333",
-};
+// One distinct fake feed per configured stock: 0x1111…, 0x2222…, and so on.
+const feeds = Object.fromEntries(
+  symbols.map((symbol, i) => [symbol, "0x" + String(i + 1).repeat(40)]),
+) as Record<MainnetStock, string>;
 let now = Date.now();
 let oracleDown: boolean, restDown: boolean, paused: Set<string>, reads: string[];
 let answer: bigint, observationAge: number, invalidRound: boolean, directoryBusy: number;

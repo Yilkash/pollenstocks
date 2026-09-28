@@ -87,3 +87,11 @@ Compilation checkpoint: `npm run build` passes (including TypeScript); `forge bu
 - The runner now closes such a step as failed (`not_broadcast`) only when Privy has no record or only a failed/provider_error record without a hash, the order expired more than 2 minutes ago (the Privy request never outlives the order), and the wallet's latest and pending nonces both still equal the step's nonce. The user is told nothing was sent. Any other case stays unknown for review.
 - Logs now record why an order step stopped and what the Privy reference lookup returned, without secrets.
 - Added 5 tests; suite reports 101 passing. TypeScript and production build pass.
+
+## 2026-09-28 — Six more stocks and ETFs
+
+- Added MSFT, GOOGL, AMZN, META, SPY and QQQ to the mainnet catalogue (9 total), verified against the Robinhood registry, Chainlink feeds and live KyberSwap quotes. See docs/STOCK_EXPANSION.md.
+- One stock list now drives tool schemas, clarification prompts, assistant instructions, name matching (Google, Facebook, S&P 500, Nasdaq and so on) and fact checks on reworded replies.
+- The Privy policy validator keeps the original rules required and accepts added-stock approve rules as optional; selling an added stock requires its rule. New `scripts/mainnet-enable-stocks.ts` adds the rules (read-only by default, `--apply` to add).
+- Holdings replies list only stocks the user holds. The landing page shows the catalogue size.
+- Added 8 tests; suite reports 109 passing.

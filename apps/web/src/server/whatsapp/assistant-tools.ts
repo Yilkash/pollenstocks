@@ -1,4 +1,8 @@
-import { mainnetStockMentions } from "../stocks/stock-language";
+import {
+  MAINNET_STOCK_ALIAS_PATTERN,
+  mainnetStockForUnit,
+  mainnetStockMentions,
+} from "../stocks/stock-language";
 import { mainnetPaymentReview } from "./mainnet-payments";
 import { mainnetWallet } from "../stocks/mainnet-orders";
 import { mainnetRpc } from "../stocks/mainnet-trade";
@@ -17,7 +21,12 @@ import { reviewPayment } from "./payment-runner";
 import { contactsReply, contactByName, contactList } from "./contacts";
 import { readyAccount, walletAddress } from "./wallet-setup";
 
-import { MAINNET_ASSETS } from "../networks/robinhood";
+import {
+  MAINNET_ASSETS,
+  MAINNET_STOCK_SYMBOLS,
+  mainnetStockChoices,
+  type MainnetStock,
+} from "../networks/robinhood";
 import {
   mainnetStockListReply,
   mainnetPortfolioReply,
@@ -34,8 +43,8 @@ import { stockListReply, stockPortfolioReply, stockQuoteReply } from "./stocks";
 type Task = {
   kind: "payment" | "contact" | "stock" | "mainnet_stock" | "mainnet_payment";
   desiredQuantity?: string;
-  priceScope?: "all" | "AAPL" | "NVDA" | "TSLA";
-  mainnetSymbol?: "AAPL" | "NVDA" | "TSLA";
+  priceScope?: "all" | MainnetStock;
+  mainnetSymbol?: MainnetStock;
   symbol?: StockSymbol;
   side?: "buy" | "sell";
   unit?: string;
@@ -48,7 +57,7 @@ type Task = {
 export function referencePriceFollowup(
   task: Task | null,
   input: string,
-): { symbol?: "AAPL" | "NVDA" | "TSLA" } | null {
+): { symbol?: MainnetStock } | null {
   if (task?.kind !== "mainnet_stock" || !task.priceScope) return null;
   const command = input
     .trim()
@@ -93,7 +102,7 @@ export const assistantTools = [
     "prepare_mainnet_stock_trade",
     "Prepare a mainnet stock trade review only when the user asks to buy/sell, not for informational prices, examples or previews. Stocks default to mainnet. Requires stock, direction and input amount; omitted buy currency means USDG. Buys are limited to 1,000 USDG and sells to 1,000 stock tokens per trade. Never reduce or split a larger request automatically. Reuse the current mainnet stock task. Omit missing fields. Sells return USDG; interpret “sell 0.001 Apple shares” as 0.001 AAPL stock tokens. Never reuse a buy budget as a sell quantity. Never executes; a separate confirmation button is mandatory. Setup may be unavailable.",
     {
-      symbol: { type: "string", enum: ["AAPL", "NVDA", "TSLA"] },
+      symbol: { type: "string", enum: MAINNET_STOCK_SYMBOLS },
       side: { type: "string", enum: ["buy", "sell"] },
       amount: { type: "string" },
       unit: { type: "string" },
@@ -105,7 +114,7 @@ export const assistantTools = [
   ),
   tool(
     "list_mainnet_stocks",
-    "Verify and list official AAPL, NVDA, TSLA mainnet addresses. Read-only catalogue.",
+    `Verify and list official mainnet stock token addresses (${MAINNET_STOCK_SYMBOLS.join(", ")}). Read-only catalogue.`,
   ),
   tool(
     "get_mainnet_stock_portfolio",
@@ -115,7 +124,7 @@ export const assistantTools = [
     "preview_mainnet_stock_price",
     "Read an indicative KyberSwap mainnet price. Default network is mainnet. Omitted buy currency means USDG; sells use stock-token quantity. Reuse the current task for preview follow-ups. Explicit other currencies must not be substituted. Omit missing fields so the tool can ask. No order or signing.",
     {
-      symbol: { type: "string", enum: ["AAPL", "NVDA", "TSLA"] },
+      symbol: { type: "string", enum: MAINNET_STOCK_SYMBOLS },
       side: { type: "string", enum: ["buy", "sell"] },
       amount: { type: "string" },
       unit: { type: "string" },
@@ -124,7 +133,7 @@ export const assistantTools = [
   tool(
     "get_stock_price",
     "Show USD reference prices per Robinhood mainnet stock token with a short update age. Preserve older/saved labels. These are not executable USDG trade quotes. For price questions without a budget or direction: Tesla price, show stock prices. Omit symbol to show all supported stocks. Never creates a trade.",
-    { symbol: { type: "string", enum: ["AAPL", "NVDA", "TSLA"] } },
+    { symbol: { type: "string", enum: MAINNET_STOCK_SYMBOLS } },
   ),
   tool(
     "list_test_stocks",
@@ -263,7 +272,8 @@ export async function runAssistantTool(
     if (name === "stock_help")
       return text(
         "Stock tokens on Robinhood mainnet\n\n" +
-          "• Apple (AAPL)\n• NVIDIA (NVDA)\n• Tesla (TSLA)\n\n" +
+          MAINNET_STOCK_SYMBOLS.map((s) => `• ${MAINNET_ASSETS[s].name} (${s})`).join("\n") +
+          "\n\n" +
           "Buy example: Buy Apple with 0.2 USDG.\n" +
           "Sell example: Sell 0.001 Apple tokens for USDG.\n" +
           mainnetTradingMessage(),
@@ -327,7 +337,7 @@ export async function runAssistantTool(
     // A large amount must not throw into the assistant's generic service-error handler.
     const parsed = z
       .object({
-        symbol: z.enum(["AAPL", "NVDA", "TSLA"]).optional(),
+        symbol: z.enum(MAINNET_STOCK_SYMBOLS).optional(),
         side: z.enum(["buy", "sell"]).optional(),
         amount: z.string().max(100).optional(),
         unit: field.optional(),
@@ -336,7 +346,7 @@ export async function runAssistantTool(
       .safeParse(args);
     if (!parsed.success)
       return text(
-        "Please specify Apple, NVIDIA or Tesla and a plain numeric amount. Buys support up to 1,000 USDG; sells support up to 1,000 stock tokens per trade.",
+        `Please specify ${mainnetStockChoices()} and a plain numeric amount. Buys support up to 1,000 USDG; sells support up to 1,000 stock tokens per trade.`,
       );
     const a = parsed.data;
     const prior = task?.kind === "mainnet_stock" ? task : undefined;
@@ -347,11 +357,11 @@ export async function runAssistantTool(
       ((/\bprices\b/i.test(input) && mentions.length === 0) ||
         (priceFollowup !== null && priceFollowup.symbol === undefined));
     if (mentions.length > 1 && name !== "get_stock_price")
-      return text("Which stock should I use for this request: Apple, NVIDIA or Tesla?");
+      return text(`Which stock should I use for this request: ${mainnetStockChoices()}?`);
     const named = mentions.length === 1 ? mentions[0] : undefined;
     const symbol = broadPrices ? undefined : (named ?? a.symbol ?? prior?.mainnetSymbol);
     if (!broadPrices && a.symbol && !mainnetStockMentions(evidence).includes(a.symbol))
-      return text("Which stock: Apple, NVIDIA or Tesla?");
+      return text(`Which stock: ${mainnetStockChoices()}?`);
     if (a.amount && !amountLiteral(a.amount))
       return text("How much would you like to spend or sell?");
     const explicitSide = /\bbuy\b/i.test(input)
@@ -380,10 +390,10 @@ export async function runAssistantTool(
       draft.amount = undefined;
       draft.unit = undefined;
     }
-    const quantity =
-      /(?<![\p{L}\p{N}.+-])(\d+(?:\.\d+)?)\s*(?:shares?|tokens?|AAPL|TSLA|NVDA|apple(?:['’]s|s)?|nvidia(?:['’]s|s)?|tesla(?:['’]s|s)?)(?![\p{L}\p{N}])/iu.exec(
-        input,
-      );
+    const quantity = new RegExp(
+      `(?<![\\p{L}\\p{N}.+-])(\\d+(?:\\.\\d+)?)\\s*(?:shares?|tokens?|${MAINNET_STOCK_ALIAS_PATTERN})(?![\\p{L}\\p{N}])`,
+      "iu",
+    ).exec(input);
     const budget =
       /\b(?:with|spend|budget|for)\s+(\d+(?:\.\d+)?)\b|\b(\d+(?:\.\d+)?)\s*USDG\b/i.exec(input);
     if (quantity && !budget) {
@@ -419,7 +429,7 @@ export async function runAssistantTool(
       return text(
         symbol
           ? `How many ${symbol} tokens would you like to sell? You can ask for your balance first.`
-          : "Which stock would you like to sell: Apple, NVIDIA or Tesla?",
+          : `Which stock would you like to sell: ${mainnetStockChoices()}?`,
       );
     }
     delete draft.priceScope;
@@ -427,7 +437,7 @@ export async function runAssistantTool(
     if (/\b(?:demo\s*usd|dusd|usdc|usdt|dollars?|usd|eth)\b/i.test(input))
       draft.unit = "unsupported";
     save(draft);
-    if (!symbol) return text("Which stock: Apple, NVIDIA or Tesla?");
+    if (!symbol) return text(`Which stock: ${mainnetStockChoices()}?`);
     if (!draft.side && !draft.amount && name === "preview_mainnet_stock_price")
       return mainnetReferencePriceReply(symbol);
     if (draft.desiredQuantity) {
@@ -464,6 +474,8 @@ export async function runAssistantTool(
       draft.unit = symbol;
       save(draft);
     }
+    // "Sell 0.5 Microsoft" may arrive with the company name as the unit.
+    if (draft.side === "sell" && mainnetStockForUnit(draft.unit) === symbol) draft.unit = symbol;
     const expected = draft.side === "buy" ? "USDG" : symbol;
     if (draft.unit?.toUpperCase() !== expected) return text(`Enter the amount in ${expected}.`);
     const decimals = draft.side === "buy" ? 6 : 18;
@@ -511,7 +523,7 @@ export async function runAssistantTool(
   if (name === "quote_stock") {
     if (/\b(?:mainnet|4663)\b/i.test(input))
       return text(
-        "This is a testnet quote tool. For mainnet, ask for an AAPL, NVDA or TSLA mainnet price preview in USDG.",
+        "This is a testnet quote tool. For mainnet, ask for a mainnet stock price preview in USDG.",
       );
     const a = z
       .object({

@@ -64,7 +64,7 @@ export async function mainnetReferencePriceReply(symbol?: MainnetStock, forceRef
     "📈 *Stock token prices · USD*\n\n" +
       lines.join("\n\n") +
       "\n\nEstimated prices. Your final quote, including fees, appears before you confirm." +
-      "\nReply ‘try again’ to refresh, or ‘all’ for all three stocks.",
+      "\nReply ‘try again’ to refresh, or ‘all’ for every stock.",
   );
 }
 
@@ -99,8 +99,14 @@ export async function mainnetPortfolioReply(db: DatabaseSync, account: string) {
     const current = read();
     if (current?.status !== "active" || current.address !== wallet.address)
       return text("Your account changed. Please request the portfolio again.");
+    // List held stocks only; the catalogue is long and zero rows add noise.
+    const stocks = result.balances.filter((a) => a.symbol !== "USDG" && a.formatted !== "0");
+    const usdg = result.balances.find((a) => a.symbol === "USDG");
+    const stockLines = stocks.length
+      ? stocks.map((a) => `${a.symbol}: ${a.formatted} tokens`).join("\n")
+      : "No stock tokens yet.";
     return text(
-      `Your Steward holdings · Robinhood mainnet\n\n${result.balances.map((a) => `${a.symbol}: ${a.formatted}${a.symbol !== "USDG" ? " tokens" : ""}`).join("\n")}\nETH: ${formatEther(result.eth)}\n\nWallet: ${wallet.address}\nStock quantities shown are raw token balances.`,
+      `Your Steward holdings · Robinhood mainnet\n\n${stockLines}\nUSDG: ${usdg?.formatted ?? "0"}\nETH: ${formatEther(result.eth)}\n\nWallet: ${wallet.address}\nStock quantities shown are raw token balances.`,
     );
   } catch {
     return text(
