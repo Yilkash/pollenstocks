@@ -23,6 +23,7 @@ import {
   checkLifiRouter,
   validateMainnetPlan,
   executionGasLimit,
+  broadcastGasPrice,
 } from "./mainnet-trade";
 import { walletStillMatches, type MainnetOrder, type MainnetReview } from "./mainnet-orders";
 import {
@@ -184,17 +185,16 @@ export async function processMainnetTrade(
         rpc.getGasPrice(),
       ]);
       ensure(nonce === latest, "wallet_transaction_pending");
-      // RPC suggestions can lag the latest block's base fee. Raise a stale
-      // suggestion to that base fee, but never exceed the confirmed ceiling.
+      // RPC suggestions can lag the latest block's base fee. Bid slightly above the
+      // higher of the two so a base-fee uptick before inclusion can't reject the
+      // broadcast, but never above the confirmed ceiling.
       ensure(
         typeof block.baseFeePerGas === "bigint" && block.baseFeePerGas >= 0n && suggestedPrice > 0n,
         "gas_price_unavailable",
       );
       const priceCeiling = BigInt(planned.gasPrice);
       ensure(block.baseFeePerGas <= priceCeiling, "network_fee_increased");
-      const currentPrice =
-        suggestedPrice > block.baseFeePerGas ? suggestedPrice : block.baseFeePerGas;
-      const actualPrice = currentPrice < priceCeiling ? currentPrice : priceCeiling;
+      const actualPrice = broadcastGasPrice(suggestedPrice, block.baseFeePerGas, priceCeiling);
       const gasLimit = executionGasLimit(gas, BigInt(planned.gas), priceCeiling, actualPrice);
       ensure(gasLimit !== null, "gas_estimate_increased");
       const remainingFee = p.steps

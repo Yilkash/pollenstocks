@@ -95,3 +95,9 @@ Compilation checkpoint: `npm run build` passes (including TypeScript); `forge bu
 - The Privy policy validator keeps the original rules required and accepts added-stock approve rules as optional; selling an added stock requires its rule. New `scripts/mainnet-enable-stocks.ts` adds the rules (read-only by default, `--apply` to add).
 - Holdings replies list only stocks the user holds. The landing page shows the catalogue size.
 - Added 8 tests; suite reports 109 passing.
+
+## 2026-09-29 — Broadcast gas bid headroom
+
+- A confirmed MSFT sell was rejected by Privy with "max fee per gas less than block base fee" (bid 20,132,000 wei vs base fee 20,138,000). The runner bid exactly the base fee it had just read, which rose before broadcast. Nothing reached the chain; the order closed as `not_broadcast`.
+- The runner now bids 5% above the higher of the RPC suggestion and base fee, capped at the confirmed price ceiling. The gas-limit check still bounds the worst-case fee by the confirmed maximum at that bid. On Arbitrum chains the sender pays the block base fee, not the bid.
+- Added 3 tests; suite reports 112 passing.

@@ -73,6 +73,16 @@ export function executionGasLimit(
   const limit = (estimate * 110n + 99n) / 100n;
   return limit * actualPrice <= reviewedGas * reviewedPrice ? limit : null;
 }
+// Gas price to broadcast with. The base fee can tick up between reading it and inclusion,
+// and a bid below the new base fee is rejected ("max fee per gas less than block base
+// fee"), so bid 5% above the current price. Never exceed the price ceiling the user
+// confirmed. On Arbitrum chains the sender pays the block base fee, not the bid, and the
+// gas-limit check below bounds the worst case by the confirmed fee at this bid.
+export function broadcastGasPrice(suggested: bigint, baseFee: bigint, ceiling: bigint) {
+  const current = suggested > baseFee ? suggested : baseFee;
+  const bid = (current * 105n + 99n) / 100n;
+  return bid < ceiling ? bid : ceiling;
+}
 export const sameAddress = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 export function mainnetTradeConfig() {
   const executor = process.env.MAINNET_KYBER_EXECUTOR?.trim();
