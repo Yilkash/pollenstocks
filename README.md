@@ -4,7 +4,7 @@
 
 ### Trade tokenized stocks and send dollars by chatting on WhatsApp.
 
-Buy **Apple, NVIDIA and Tesla** stock tokens with USDG on **Robinhood Chain**, just by texting.<br/>
+Buy **Apple, Tesla, NVIDIA, Microsoft, the S&P 500** and more with USDG on **Robinhood Chain**, just by texting.<br/>
 **SERV Reasoning** understands what you mean. Steward shows you the exact deal. **Nothing moves until you tap Confirm.**
 
 <br/>
@@ -14,8 +14,8 @@ Buy **Apple, NVIDIA and Tesla** stock tokens with USDG on **Robinhood Chain**, j
 
 ![Robinhood Chain](https://img.shields.io/badge/Robinhood_Chain-mainnet_4663-CCFF00?style=flat-square)
 ![SERV Reasoning](https://img.shields.io/badge/AI-SERV_Reasoning-6E56CF?style=flat-square)
-![Stocks](https://img.shields.io/badge/stocks-AAPL_·_NVDA_·_TSLA-0A84FF?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-101_passing-2EA043?style=flat-square)
+![Stocks](https://img.shields.io/badge/stocks_&_ETFs-9-0A84FF?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-109_passing-2EA043?style=flat-square)
 
 **OpenServ SERV Hackathon · Edition 01 · Mainnet & MCP track**
 
@@ -98,6 +98,8 @@ What are the prices?
 What would 1 USDG get me in Tesla?
 Buy AAPL with 0.5 USDG
 Buy NVIDIA with 2 USDG
+Buy SPY with 2 USDG
+Buy Microsoft with 1 USDG
 Sell 0.001 Apple shares
 Show my mainnet stocks
 Stock trade status
@@ -137,15 +139,15 @@ Prefer buttons? The **menu** has shortcuts for every core action:
 
 ## ✨ Features
 
-|                                |                                                                                                                                                                    |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **📈 Stock tokens on mainnet** | Buy and sell **AAPL, NVDA and TSLA** tokens for USDG. Every review shows the expected and minimum output, provider fee, maximum network fee and a 4-minute expiry. |
-| **🔀 Resilient routing**       | Quotes come from the **KyberSwap** aggregator. When Kyber is overloaded, Steward falls back to **LI.FI**.                                                          |
-| **💸 USDG payments**           | Send to a saved contact, a wallet address or an opted-in phone number. Receipts link to the block explorer.                                                        |
-| **👛 A wallet per user**       | A Privy-managed Robinhood Chain wallet is created after explicit consent. You never handle a seed phrase.                                                          |
-| **🧠 Conversational memory**   | Missing details are collected across messages. Short-lived memory is encrypted at rest.                                                                            |
-| **🛡️ Prompt-injection guard**  | SERV's `serv_prompt_guard` blocks attempts to override Steward's rules before the model runs.                                                                      |
-| **🧪 Testnet mode**            | Try Demo USD payments on testnet without real money.                                                                                                               |
+|                                |                                                                                                                                                                                                                                                                |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **📈 Stock tokens on mainnet** | Buy and sell **9 stocks and ETFs** for USDG: Apple, NVIDIA, Tesla, Microsoft, Alphabet, Amazon, Meta, the S&P 500 (SPY) and the Nasdaq-100 (QQQ). Every review shows the expected and minimum output, provider fee, maximum network fee and a 4-minute expiry. |
+| **🔀 Resilient routing**       | Quotes come from the **KyberSwap** aggregator. When Kyber is overloaded, Steward falls back to **LI.FI**.                                                                                                                                                      |
+| **💸 USDG payments**           | Send to a saved contact, a wallet address or an opted-in phone number. Receipts link to the block explorer.                                                                                                                                                    |
+| **👛 A wallet per user**       | A Privy-managed Robinhood Chain wallet is created after explicit consent. You never handle a seed phrase.                                                                                                                                                      |
+| **🧠 Conversational memory**   | Missing details are collected across messages. Short-lived memory is encrypted at rest.                                                                                                                                                                        |
+| **🛡️ Prompt-injection guard**  | SERV's `serv_prompt_guard` blocks attempts to override Steward's rules before the model runs.                                                                                                                                                                  |
+| **🧪 Testnet mode**            | Try Demo USD payments on testnet without real money.                                                                                                                                                                                                           |
 
 ---
 
@@ -208,12 +210,18 @@ Real trades executed through Steward on Robinhood Chain:
 
 **Supported assets (Robinhood Chain mainnet 4663)**
 
-| Asset         | Contract                                     |
-| ------------- | -------------------------------------------- |
-| USDG          | `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` |
-| Apple · AAPL  | `0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9` |
-| NVIDIA · NVDA | `0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC` |
-| Tesla · TSLA  | `0x322F0929c4625eD5bAd873c95208D54E1c003b2d` |
+| Asset                | Contract                                     |
+| -------------------- | -------------------------------------------- |
+| USDG                 | `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` |
+| Apple · AAPL         | `0xaF3D76f1834A1d425780943C99Ea8A608f8a93f9` |
+| NVIDIA · NVDA        | `0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC` |
+| Tesla · TSLA         | `0x322F0929c4625eD5bAd873c95208D54E1c003b2d` |
+| Microsoft · MSFT     | `0xe93237C50D904957Cf27E7B1133b510C669c2e74` |
+| Alphabet · GOOGL     | `0x2e0847E8910a9732eB3fb1bb4b70a580ADAD4FE3` |
+| Amazon · AMZN        | `0x12f190a9F9d7D37a250758b26824B97CE941bF54` |
+| Meta · META          | `0xc0D6457C16Cc70d6790Dd43521C899C87ce02f35` |
+| S&P 500 ETF · SPY    | `0x117cc2133c37B721F49dE2A7a74833232B3B4C0C` |
+| Nasdaq-100 ETF · QQQ | `0xD5f3879160bc7c32ebb4dC785F8a4F505888de68` |
 
 ---
 
@@ -297,7 +305,7 @@ Every setting is documented in `apps/web/.env.example`. Mainnet trading stays of
 
 ```bash
 cd apps/web
-npm test                     # 101 Node tests
+npm test                     # 109 Node tests
 npm run typecheck
 npm run build
 npm run test:browser         # 8 Playwright wallet regressions
