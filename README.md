@@ -78,7 +78,7 @@ The result is a real mainnet trade, which you can [verify on-chain](#-live-on-ma
 
 1. **Open WhatsApp** at [wa.me/2348051064171](https://wa.me/2348051064171?text=Hi) and say hi.
 2. **Tap Create account.** Steward creates your own Robinhood Chain wallet after you consent. There's no seed phrase to manage.
-3. **Fund it.** Ask for your deposit address, then send it a little **USDG** plus a small amount of **ETH** for gas.
+3. **Fund it.** Ask for your deposit address and send it some **USDG**. New wallets get a one-time **🎁 0.0001 ETH welcome gift** for network fees on their first trade, enough for several trades, so you don't have to buy gas first.
 
    ```text
    Where can I deposit on mainnet?
@@ -336,6 +336,7 @@ The market is the huge number of WhatsApp users who want exposure to US stocks b
 - Swap routes rely on Kyber's and LI.FI's executors. Their packed internals are provider-trusted and pinned by code hash, not independently audited.
 - Steward controls user wallets through Privy, so access to a user's WhatsApp account gives access to their Steward wallet.
 - Payments are capped at 1,000 USDG. Chat memory keeps four recent exchanges for one hour.
+- The ETH welcome gift is one per account and wallet, needs at least 1 USDG in the wallet, and is limited per day; after that users add their own ETH.
 
 ---
 
