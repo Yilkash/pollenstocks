@@ -12,11 +12,11 @@ export const text = (body: string) => ({ type: "text", text: { body } });
 export const capabilities = [
   "Hi, I’m Pollenstock 👋",
   "",
-  "💸 Send, receive and check balances",
-  "📋 Track payments and manage contacts",
-  "📈 Buy, sell and track stock tokens",
+  "📈 Buy and sell NVIDIA, Circle, GameStop and AMC",
+  "💸 Send USDC to contacts and phone numbers",
+  "📋 Check balances and recent activity",
   "",
-  "Payments use USDC on Arc.",
+  "Everything uses USDC on Arc, including network fees.",
   "Payments and trades require confirmation.",
 ].join("\n");
 export function onboardingWelcome() {
@@ -25,7 +25,7 @@ export function onboardingWelcome() {
     interactive: {
       type: "button",
       body: {
-        text: "Hi, I’m Pollenstock 👋\nSend USDC, check balances and trade stock tokens on Arc.\n\nCreate your account to begin. Mainnet transactions use real assets.",
+        text: "Hi, I’m Pollenstock 👋\nOwn real US stocks like NVIDIA and Circle with just USDC, right here in WhatsApp. No app, no seed phrase, and no gas token to buy.\n\nCreate your account to begin. Trades use real assets.",
       },
       action: {
         buttons: [{ type: "reply", reply: { id: "menu:create", title: "Create account" } }],

@@ -14,9 +14,9 @@ import { actionFor, menu, text, onboardingWelcome } from "./menu";
 import { migrateWalletSetup, walletSetupReply, walletAddress, readyAccount } from "./wallet-setup";
 
 // Version the exact disclosure so later custody changes require fresh consent.
-export const CONSENT_VERSION = "steward-account-v2";
+export const CONSENT_VERSION = "pollenstock-account-v1";
 export const DISCLOSURE =
-  "Create a Pollenstock account\n\nPollenstock controls your wallet and authorizes only transactions you confirm. Mainnet USDC payments and stock trades use real assets. Testnet Demo USD is for practice. Control of this WhatsApp account gives access to your Pollenstock account.\n\nContinuing creates your account and requests a dedicated mainnet wallet. No funds are added. Phone-number recipient lookup is off until you choose to enable it.\n\nThis choice expires in 10 minutes.";
+  "Create a Pollenstock account\n\nPollenstock controls your wallet and authorizes only transactions you confirm. USDC payments and stock trades on Arc use real assets. Stock tokens on Arc are issued by a third party and backed, according to the issuer, by Robinhood Chain stock tokens; they are not direct share ownership. Control of this WhatsApp account gives access to your Pollenstock account.\n\nContinuing creates your account and requests a dedicated mainnet wallet. No funds are added. Phone-number recipient lookup is off until you choose to enable it.\n\nThis choice expires in 10 minutes.";
 type Account = { id: string; status: string; wallet_state: string };
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 export function migrateAccounts(db: DatabaseSync) {
@@ -139,6 +139,15 @@ export function accountReply(
           "Create your Pollenstock account first to use phone-number settings. Type Menu to begin.",
         );
   }
+  // Pollenstock has no testnet. Steward's Demo USD handlers remain in the code but must not
+  // answer typed messages, or users would see Robinhood testnet wording.
+  if (
+    !/^[a-z]+:/.test(message.input) &&
+    /\b(?:testnet|demo\s*usd|dusd|46630)\b/i.test(message.input)
+  )
+    return text(
+      "Pollenstock runs only on Arc mainnet with real USDC. There is no testnet or Demo USD. Type Menu to see what you can do.",
+    );
   // Ordinary chat language reaches intent inference first. Button payloads keep
   // their deterministic handlers and cannot authorize actions through the model.
   if (

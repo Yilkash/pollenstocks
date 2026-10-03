@@ -188,7 +188,7 @@ export async function mainnetTradeReviewReply(
       route_busy: "The trading quote service is busy right now.",
       route_build_unavailable: "The quote service couldn’t prepare this trade.",
       route_expired: "The provider returned an expired quote.",
-      registry_unavailable: "Robinhood’s token registry is temporarily unavailable.",
+      registry_unavailable: "The stock token check on Arc is temporarily unavailable.",
       invalid_amount: "Please provide a valid spending amount.",
     };
     console.warn(

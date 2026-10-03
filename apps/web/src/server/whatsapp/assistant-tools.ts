@@ -111,7 +111,7 @@ const tool = (
     parameters: { type: "object", properties, required, additionalProperties: false },
   },
 });
-export const assistantTools = [
+const allAssistantTools = [
   tool(
     "get_mainnet_receive_address",
     "Show the authenticated user's Arc funding address for USDC (USDC also pays gas on Arc). Provisions the first wallet only if missing; otherwise reuses the existing wallet. One mainnet wallet per account: cannot create another wallet or change the address. Use only when the user requests their address, funding or deposit instructions, not for complaints, explanations, or second-wallet requests; mainnet is the default. Never accepts an address or account argument. Does not trade or transfer funds.",
@@ -122,7 +122,7 @@ export const assistantTools = [
   ),
   tool(
     "prepare_mainnet_stock_trade",
-    "Prepare a mainnet stock trade review only when the user asks to buy/sell, not for informational prices, examples or previews. Stocks default to mainnet. Requires stock, direction and input amount; omitted buy currency means USDC. Buys are limited to 1,000 USDC and sells to 1,000 stock tokens per trade. Never reduce or split a larger request automatically. Reuse the current mainnet stock task. Omit missing fields. Sells return USDC; interpret “sell 0.001 Apple shares” as 0.001 AAPL stock tokens. Never reuse a buy budget as a sell quantity. Never executes; a separate confirmation button is mandatory. Setup may be unavailable.",
+    "Prepare a mainnet stock trade review only when the user asks to buy/sell, not for informational prices, examples or previews. Stocks default to mainnet. Requires stock, direction and input amount; omitted buy currency means USDC. Buys are limited to 1,000 USDC and sells to 1,000 stock tokens per trade. Never reduce or split a larger request automatically. Reuse the current mainnet stock task. Omit missing fields. Sells return USDC; interpret “sell 0.001 NVIDIA shares” as 0.001 NVDA stock tokens. Never reuse a buy budget as a sell quantity. Never executes; a separate confirmation button is mandatory. Setup may be unavailable.",
     {
       symbol: { type: "string", enum: MAINNET_STOCK_SYMBOLS },
       side: { type: "string", enum: ["buy", "sell"] },
@@ -154,7 +154,7 @@ export const assistantTools = [
   ),
   tool(
     "get_stock_price",
-    "Show USD reference prices per Arc stock token with a short update age. Preserve older/saved labels. These are not executable USDC trade quotes. For price questions without a budget or direction: Tesla price, show stock prices. Omit symbol to show all supported stocks. Never creates a trade.",
+    "Show USD reference prices per Arc stock token with a short update age. Preserve older/saved labels. These are not executable USDC trade quotes. For price questions without a budget or direction: NVIDIA price, show stock prices. Omit symbol to show all supported stocks. Never creates a trade.",
     { symbol: { type: "string", enum: MAINNET_STOCK_SYMBOLS } },
   ),
   tool(
@@ -225,6 +225,11 @@ export const assistantTools = [
     "Discard an unfinished draft or unconfirmed review. Never cancels a submitted transaction.",
   ),
 ];
+// Pollenstock has no testnet mode; Steward's Robinhood testnet stock tools stay unexposed.
+const TESTNET_ONLY_TOOLS = ["list_test_stocks", "get_stock_portfolio", "quote_stock"];
+export const assistantTools = allAssistantTools.filter(
+  (t) => !TESTNET_ONLY_TOOLS.includes(t.function.name),
+);
 export function currentTask(
   db: DatabaseSync,
   key: Buffer,
@@ -296,8 +301,8 @@ export async function runAssistantTool(
         "Stock tokens on Arc\n\n" +
           MAINNET_STOCK_SYMBOLS.map((s) => `• ${MAINNET_ASSETS[s].name} (${s})`).join("\n") +
           "\n\n" +
-          "Buy example: Buy Apple with 0.2 USDC.\n" +
-          "Sell example: Sell 0.001 Apple tokens for USDC.\n" +
+          "Buy example: Buy NVIDIA with 1 USDC.\n" +
+          "Sell example: Sell 0.001 NVIDIA for USDC.\n" +
           mainnetTradingMessage(),
       );
     if (name === "list_test_stocks") return stockListReply();

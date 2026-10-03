@@ -37,7 +37,7 @@ export class Store {
     const id = randomBytes(24).toString("hex");
     const expires = Date.now() + 5 * 60_000;
     const message = [
-      new URL(origin).host + " wants you to sign in to Steward Pay:",
+      new URL(origin).host + " wants you to sign in to Pollenstock:",
       wallet,
       "",
       "Sign in to view your contacts and prepare testnet payments. This does not authorize a transfer.",
