@@ -395,7 +395,9 @@ export async function runAssistantTool(
       "iu",
     ).exec(input);
     const budget =
-      /\b(?:with|spend|budget|for)\s+(\d+(?:\.\d+)?)\b|\b(\d+(?:\.\d+)?)\s*USDG\b/i.exec(input);
+      /\b(?:with|spend|budget|for|use)\s+\$?(\d+(?:\.\d+)?)\b|\$(\d+(?:\.\d+)?)\b|\b(\d+(?:\.\d+)?)\s*(?:USDG|usd|dollars?)\b/i.exec(
+        input,
+      );
     if (quantity && !budget) {
       draft.desiredQuantity = quantity[1];
       draft.amount = undefined;
@@ -414,7 +416,7 @@ export async function runAssistantTool(
     }
     if (budget) {
       draft.desiredQuantity = undefined;
-      draft.amount = budget[1] ?? budget[2];
+      draft.amount = budget[1] ?? budget[2] ?? budget[3];
       draft.unit = "USDG";
     }
     if (name === "get_stock_price") {
@@ -433,9 +435,10 @@ export async function runAssistantTool(
       );
     }
     delete draft.priceScope;
+    // "usd", "dollars" and "$" all mean the app's dollar token (USDG).
+    if (draft.unit && /^(?:usd|usdg|dollars?|\$)$/i.test(draft.unit.trim())) draft.unit = "USDG";
     if (!draft.unit && draft.side) draft.unit = draft.side === "buy" ? "USDG" : symbol;
-    if (/\b(?:demo\s*usd|dusd|usdc|usdt|dollars?|usd|eth)\b/i.test(input))
-      draft.unit = "unsupported";
+    if (/\b(?:demo\s*usd|dusd|usdc|usdt|eth)\b/i.test(input)) draft.unit = "unsupported";
     save(draft);
     if (!symbol) return text(`Which stock: ${mainnetStockChoices()}?`);
     if (!draft.side && !draft.amount && name === "preview_mainnet_stock_price")

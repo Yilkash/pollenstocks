@@ -50,6 +50,45 @@ for (const name of ["Apple", "apples", "Apple's", "Apple’s", "AAPL"]) {
   });
 }
 
+for (const input of [
+  "I want to use 1 usd to buy a share of appl",
+  "Buy Apple with 1 dollar",
+  "buy apple with $1",
+]) {
+  test(`"${input}" is a 1 USDG Apple buy`, async () => {
+    const db = new DatabaseSync(":memory:");
+    const key = Buffer.alloc(32, 3);
+    const enabled = process.env.MAINNET_STOCK_TRADING_ENABLED;
+    process.env.MAINNET_STOCK_TRADING_ENABLED = "false";
+    mock.method(globalThis, "fetch", async () => {
+      throw Error("unexpected network access");
+    });
+    try {
+      migrateAccounts(db);
+      // The model reads "usd"/"dollar" as the unit; the tool must not reject it.
+      await runAssistantTool(
+        db,
+        key,
+        "test-account",
+        "15550001111",
+        "message",
+        "consent",
+        input,
+        input,
+        "prepare_mainnet_stock_trade",
+        { symbol: "AAPL", side: "buy", amount: "1", unit: "USD" },
+      );
+      const draft = currentTask(db, key, "test-account", "consent");
+      assert.equal(draft?.amount, "1");
+      assert.equal(draft?.unit, "USDG");
+    } finally {
+      db.close();
+      if (enabled === undefined) delete process.env.MAINNET_STOCK_TRADING_ENABLED;
+      else process.env.MAINNET_STOCK_TRADING_ENABLED = enabled;
+    }
+  });
+}
+
 test("aliases preserve boundaries and identify ambiguous multiple stocks", () => {
   assert.deepEqual(mainnetStockMentions("pineapples Appleton AAPLs TeslaXYZ"), []);
   assert.deepEqual(mainnetStockMentions("Apple and Tesla"), ["AAPL", "TSLA"]);
