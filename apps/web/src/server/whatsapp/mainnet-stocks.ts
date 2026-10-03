@@ -2,7 +2,7 @@ import { ensureMainnetWallet } from "../stocks/mainnet-wallet";
 import { mainnetWallet } from "../stocks/mainnet-orders";
 import type { DatabaseSync } from "node:sqlite";
 import { formatEther, formatUnits, getAddress } from "viem";
-import { MAINNET_ASSETS, MAINNET_EXECUTION_READY, type MainnetStock } from "../networks/robinhood";
+import { MAINNET_ASSETS, MAINNET_EXECUTION_READY, type MainnetStock } from "../networks/chain";
 import {
   MainnetReadError,
   mainnetPortfolio,
@@ -72,7 +72,7 @@ export async function mainnetStockListReply() {
   try {
     await verifiedMainnetRegistry();
     return text(
-      "Stock tokens on Robinhood mainnet\n\n" +
+      "Stock tokens on Arc\n\n" +
         Object.entries(MAINNET_ASSETS)
           .map(([symbol, a]) => `• ${a.name} (${symbol})`)
           .join("\n") +
@@ -100,13 +100,13 @@ export async function mainnetPortfolioReply(db: DatabaseSync, account: string) {
     if (current?.status !== "active" || current.address !== wallet.address)
       return text("Your account changed. Please request the portfolio again.");
     // List held stocks only; the catalogue is long and zero rows add noise.
-    const stocks = result.balances.filter((a) => a.symbol !== "USDG" && a.formatted !== "0");
-    const usdg = result.balances.find((a) => a.symbol === "USDG");
+    const stocks = result.balances.filter((a) => a.symbol !== "USDC" && a.formatted !== "0");
+    const usdg = result.balances.find((a) => a.symbol === "USDC");
     const stockLines = stocks.length
       ? stocks.map((a) => `${a.symbol}: ${a.formatted} tokens`).join("\n")
       : "No stock tokens yet.";
     return text(
-      `Your Steward holdings · Robinhood mainnet\n\n${stockLines}\nUSDG: ${usdg?.formatted ?? "0"}\nETH: ${formatEther(result.eth)}\n\nWallet: ${wallet.address}\nStock quantities shown are raw token balances.`,
+      `Your Pollenstock holdings · Arc\n\n${stockLines}\nUSDC: ${usdg?.formatted ?? "0"}\n\nWallet: ${wallet.address}\nStock quantities shown are raw token balances.`,
     );
   } catch {
     return text(
@@ -122,7 +122,7 @@ export async function mainnetPriceReply(
   try {
     const p = await mainnetPrice(symbol, side, amount);
     return text(
-      `${symbol} · ${side} preview\nRobinhood mainnet\n\nSpend: ${formatUnits(p.sellAmount, p.sellDecimals)} ${side === "buy" ? "USDG" : symbol}\nEstimated receive: ${formatUnits(p.buyAmount, p.buyDecimals)} ${side === "buy" ? symbol : "USDG"}\n${p.networkFeeUsd && Number(p.networkFeeUsd) > 0 ? `Estimated network fee: $${Number(p.networkFeeUsd).toFixed(4)}` : "Network fee calculated at trade review"}\n\n${p.provider} · ${new Date(Number(p.timestamp) * 1000).toISOString().slice(11, 19)} UTC\nEstimate only; no trade created.`,
+      `${symbol} · ${side} preview\nArc\n\nSpend: ${formatUnits(p.sellAmount, p.sellDecimals)} ${side === "buy" ? "USDC" : symbol}\nEstimated receive: ${formatUnits(p.buyAmount, p.buyDecimals)} ${side === "buy" ? symbol : "USDC"}\n${p.networkFeeUsd && Number(p.networkFeeUsd) > 0 ? `Estimated network fee: $${Number(p.networkFeeUsd).toFixed(4)}` : "Network fee calculated at trade review"}\n\n${p.provider} · ${new Date(Number(p.timestamp) * 1000).toISOString().slice(11, 19)} UTC\nEstimate only; no trade created.`,
     );
   } catch (error) {
     const code = error instanceof MainnetReadError ? error.code : "unavailable";
@@ -136,7 +136,7 @@ export async function mainnetPriceReply(
       );
     if (code === "invalid_amount")
       return text(
-        "Give a positive input amount up to 1,000: USDG for a buy, or stock-token quantity for a sell. USDG supports 6 decimal places; stock tokens support 18.",
+        "Give a positive input amount up to 1,000: USDC for a buy, or stock-token quantity for a sell. USDC supports 6 decimal places; stock tokens support 18.",
       );
     return text(
       "I couldn’t get a verified mainnet price preview. The service or requested route may be unavailable. No order was created.",
@@ -148,14 +148,14 @@ export async function mainnetReceiveReply(db: DatabaseSync, account: string) {
   try {
     const wallet = await ensureMainnetWallet(db, account);
     return text(
-      `Your mainnet funding address\n\n${wallet.address}\n\nRobinhood mainnet (4663) only.\nReceive USDG for purchases and ETH for network fees.\n${mainnetTradingMessage()}`,
+      `Your mainnet funding address\n\n${wallet.address}\n\nArc (chain 5042) only.\nSend USDC on Arc. USDC also pays the network fee, so it is the only coin you need.\n${mainnetTradingMessage()}`,
     );
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
     if (code === "mainnet_policy_required")
       return text("Mainnet wallet setup is not available yet. Your testnet wallet is separate.");
     if (code === "account_not_active")
-      return text("An active Steward account is required. Type Menu to get started.");
+      return text("An active Pollenstock account is required. Type Menu to get started.");
     return text(
       "I couldn’t finish checking your mainnet wallet. Ask ‘Show my mainnet wallet’ again shortly. No funds were sent.",
     );

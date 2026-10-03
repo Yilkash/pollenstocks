@@ -7,7 +7,7 @@ import { mainnetPaymentReview } from "./mainnet-payments";
 import { mainnetWallet } from "../stocks/mainnet-orders";
 import { mainnetRpc } from "../stocks/mainnet-trade";
 import { erc20Abi, formatEther } from "viem";
-import { MAINNET_USDG } from "../networks/robinhood";
+import { MAINNET_QUOTE } from "../networks/chain";
 import { mainnetTradeReviewReply, mainnetTradeStatusReply } from "../stocks/mainnet-orders";
 import { normalizePhone } from "./phone-recipients";
 import type { DatabaseSync } from "node:sqlite";
@@ -26,7 +26,7 @@ import {
   MAINNET_STOCK_SYMBOLS,
   mainnetStockChoices,
   type MainnetStock,
-} from "../networks/robinhood";
+} from "../networks/chain";
 import {
   mainnetStockListReply,
   mainnetPortfolioReply,
@@ -114,7 +114,7 @@ const tool = (
 export const assistantTools = [
   tool(
     "get_mainnet_receive_address",
-    "Show the authenticated user's Robinhood mainnet funding address for USDG and ETH. Provisions the first wallet only if missing; otherwise reuses the existing wallet. One mainnet wallet per account: cannot create another wallet or change the address. Use only when the user requests their address, funding or deposit instructions, not for complaints, explanations, or second-wallet requests; mainnet is the default. Never accepts an address or account argument. Does not trade or transfer funds.",
+    "Show the authenticated user's Arc funding address for USDC (USDC also pays gas on Arc). Provisions the first wallet only if missing; otherwise reuses the existing wallet. One mainnet wallet per account: cannot create another wallet or change the address. Use only when the user requests their address, funding or deposit instructions, not for complaints, explanations, or second-wallet requests; mainnet is the default. Never accepts an address or account argument. Does not trade or transfer funds.",
   ),
   tool(
     "get_mainnet_trade_status",
@@ -122,7 +122,7 @@ export const assistantTools = [
   ),
   tool(
     "prepare_mainnet_stock_trade",
-    "Prepare a mainnet stock trade review only when the user asks to buy/sell, not for informational prices, examples or previews. Stocks default to mainnet. Requires stock, direction and input amount; omitted buy currency means USDG. Buys are limited to 1,000 USDG and sells to 1,000 stock tokens per trade. Never reduce or split a larger request automatically. Reuse the current mainnet stock task. Omit missing fields. Sells return USDG; interpret “sell 0.001 Apple shares” as 0.001 AAPL stock tokens. Never reuse a buy budget as a sell quantity. Never executes; a separate confirmation button is mandatory. Setup may be unavailable.",
+    "Prepare a mainnet stock trade review only when the user asks to buy/sell, not for informational prices, examples or previews. Stocks default to mainnet. Requires stock, direction and input amount; omitted buy currency means USDC. Buys are limited to 1,000 USDC and sells to 1,000 stock tokens per trade. Never reduce or split a larger request automatically. Reuse the current mainnet stock task. Omit missing fields. Sells return USDC; interpret “sell 0.001 Apple shares” as 0.001 AAPL stock tokens. Never reuse a buy budget as a sell quantity. Never executes; a separate confirmation button is mandatory. Setup may be unavailable.",
     {
       symbol: { type: "string", enum: MAINNET_STOCK_SYMBOLS },
       side: { type: "string", enum: ["buy", "sell"] },
@@ -132,7 +132,7 @@ export const assistantTools = [
   ),
   tool(
     "stock_help",
-    "Show Steward's supported stock catalogue and explain price previews versus execution. Use for general stock/share/equity availability or capabilities, including misspellings, without requiring a network or amount. For a specific unsupported company, answer directly that it is unsupported rather than calling this tool. For a purchase request, collect the stock and budget with the trade preparation tool. This is the configured catalogue, not a live tradability check.",
+    "Show Pollenstock's supported stock catalogue and explain price previews versus execution. Use for general stock/share/equity availability or capabilities, including misspellings, without requiring a network or amount. For a specific unsupported company, answer directly that it is unsupported rather than calling this tool. For a purchase request, collect the stock and budget with the trade preparation tool. This is the configured catalogue, not a live tradability check.",
   ),
   tool(
     "list_mainnet_stocks",
@@ -140,11 +140,11 @@ export const assistantTools = [
   ),
   tool(
     "get_mainnet_stock_portfolio",
-    "Read mainnet holdings at the user's existing Steward address, defaulting to mainnet unless testnet is explicitly requested. Does not activate a mainnet wallet.",
+    "Read mainnet holdings at the user's existing Pollenstock address, defaulting to mainnet unless testnet is explicitly requested. Does not activate a mainnet wallet.",
   ),
   tool(
     "preview_mainnet_stock_price",
-    "Read an indicative KyberSwap mainnet price. Default network is mainnet. Omitted buy currency means USDG; sells use stock-token quantity. Reuse the current task for preview follow-ups. Explicit other currencies must not be substituted. Omit missing fields so the tool can ask. No order or signing.",
+    "Read an indicative KyberSwap mainnet price. Default network is mainnet. Omitted buy currency means USDC; sells use stock-token quantity. Reuse the current task for preview follow-ups. Explicit other currencies must not be substituted. Omit missing fields so the tool can ask. No order or signing.",
     {
       symbol: { type: "string", enum: MAINNET_STOCK_SYMBOLS },
       side: { type: "string", enum: ["buy", "sell"] },
@@ -154,7 +154,7 @@ export const assistantTools = [
   ),
   tool(
     "get_stock_price",
-    "Show USD reference prices per Robinhood mainnet stock token with a short update age. Preserve older/saved labels. These are not executable USDG trade quotes. For price questions without a budget or direction: Tesla price, show stock prices. Omit symbol to show all supported stocks. Never creates a trade.",
+    "Show USD reference prices per Arc stock token with a short update age. Preserve older/saved labels. These are not executable USDC trade quotes. For price questions without a budget or direction: Tesla price, show stock prices. Omit symbol to show all supported stocks. Never creates a trade.",
     { symbol: { type: "string", enum: MAINNET_STOCK_SYMBOLS } },
   ),
   tool(
@@ -163,24 +163,24 @@ export const assistantTools = [
   ),
   tool(
     "get_stock_portfolio",
-    "Read actual test-stock and USDG balances in the user's Steward wallet, not their external MetaMask wallet.",
+    "Read actual test-stock and USDC balances in the user's Pollenstock wallet, not their external MetaMask wallet.",
   ),
   tool(
     "quote_stock",
-    "Collect a read-only buy/sell estimate. Omit missing fields; reuse the stock task. Buy input must be explicit USDG budget; sell input must be stock-token quantity. Never convert USD, Demo USD or requested stock output into USDG. No orders or confirmations are created.",
+    "Collect a read-only buy/sell estimate. Omit missing fields; reuse the stock task. Buy input must be explicit USDC budget; sell input must be stock-token quantity. Never convert USD, Demo USD or requested stock output into USDC. No orders or confirmations are created.",
     {
       symbol: { type: "string", enum: ["TSLA", "AMD", "NFLX", "AMZN"] },
       side: { type: "string", enum: ["buy", "sell"] },
       amount: { type: "string" },
       unit: {
         type: "string",
-        description: "User-stated input unit, e.g. USDG, TSLA, USD or Demo USD; omit if unstated.",
+        description: "User-stated input unit, e.g. USDC, TSLA, USD or Demo USD; omit if unstated.",
       },
     },
   ),
   tool(
     "get_balance",
-    "Read mainnet USDG, ETH and stock balances by default. Testnet only when explicitly requested.",
+    "Read mainnet USDC and stock balances by default. Testnet only when explicitly requested.",
   ),
   tool(
     "get_recent_payments",
@@ -188,7 +188,7 @@ export const assistantTools = [
   ),
   tool(
     "get_receive_address",
-    "Show the user's own Robinhood mainnet receiving address by default. Reuses their wallet; cannot create another or replace it. Not for questions about why the address is unchanged.",
+    "Show the user's own Arc receiving address by default. Reuses their wallet; cannot create another or replace it. Not for questions about why the address is unchanged.",
   ),
   tool(
     "get_account",
@@ -200,7 +200,7 @@ export const assistantTools = [
   ]),
   tool(
     "check_affordability",
-    "Check a USDG amount against the mainnet balance; fees are checked at review. Explicit testnet requests use Demo USD. Never prepares or sends a payment.",
+    "Check a USDC amount against the mainnet balance; fees are checked at review. Explicit testnet requests use Demo USD. Never prepares or sends a payment.",
     { amount: { type: "string" } },
     ["amount"],
   ),
@@ -293,11 +293,11 @@ export async function runAssistantTool(
     if (name === "get_mainnet_trade_status") return mainnetTradeStatusReply(db, account);
     if (name === "stock_help")
       return text(
-        "Stock tokens on Robinhood mainnet\n\n" +
+        "Stock tokens on Arc\n\n" +
           MAINNET_STOCK_SYMBOLS.map((s) => `• ${MAINNET_ASSETS[s].name} (${s})`).join("\n") +
           "\n\n" +
-          "Buy example: Buy Apple with 0.2 USDG.\n" +
-          "Sell example: Sell 0.001 Apple tokens for USDG.\n" +
+          "Buy example: Buy Apple with 0.2 USDC.\n" +
+          "Sell example: Sell 0.001 Apple tokens for USDC.\n" +
           mainnetTradingMessage(),
       );
     if (name === "list_test_stocks") return stockListReply();
@@ -368,7 +368,7 @@ export async function runAssistantTool(
       .safeParse(args);
     if (!parsed.success)
       return text(
-        `Please specify ${mainnetStockChoices()} and a plain numeric amount. Buys support up to 1,000 USDG; sells support up to 1,000 stock tokens per trade.`,
+        `Please specify ${mainnetStockChoices()} and a plain numeric amount. Buys support up to 1,000 USDC; sells support up to 1,000 stock tokens per trade.`,
       );
     const a = parsed.data;
     const prior = task?.kind === "mainnet_stock" ? task : undefined;
@@ -422,7 +422,7 @@ export async function runAssistantTool(
       "iu",
     ).exec(input);
     const budget =
-      /\b(?:with|spend|budget|for|use)\s+\$?(\d+(?:\.\d+)?)\b|\$(\d+(?:\.\d+)?)\b|\b(\d+(?:\.\d+)?)\s*(?:USDG|usd|dollars?)\b/i.exec(
+      /\b(?:with|spend|budget|for|use)\s+\$?(\d+(?:\.\d+)?)\b|\$(\d+(?:\.\d+)?)\b|\b(\d+(?:\.\d+)?)\s*(?:USDC|usd|dollars?)\b/i.exec(
         input,
       );
     if (quantity && !budget) {
@@ -438,13 +438,13 @@ export async function runAssistantTool(
     ) {
       draft.desiredQuantity = undefined;
       draft.amount = input.trim();
-      draft.unit = "USDG";
+      draft.unit = "USDC";
       draft.side = "buy";
     }
     if (budget) {
       draft.desiredQuantity = undefined;
       draft.amount = budget[1] ?? budget[2] ?? budget[3];
-      draft.unit = "USDG";
+      draft.unit = "USDC";
     }
     if (name === "get_stock_price") {
       save({ kind: "mainnet_stock", mainnetSymbol: symbol, priceScope: symbol ?? "all" });
@@ -462,10 +462,10 @@ export async function runAssistantTool(
       );
     }
     delete draft.priceScope;
-    // "usd", "dollars" and "$" all mean the app's dollar token (USDG).
-    if (draft.unit && /^(?:usd|usdg|dollars?|\$)$/i.test(draft.unit.trim())) draft.unit = "USDG";
-    if (!draft.unit && draft.side) draft.unit = draft.side === "buy" ? "USDG" : symbol;
-    if (/\b(?:demo\s*usd|dusd|usdc|usdt|eth)\b/i.test(input)) draft.unit = "unsupported";
+    // "usd", "dollars" and "$" all mean the app's dollar token (USDC).
+    if (draft.unit && /^(?:usd|usdc|dollars?|\$)$/i.test(draft.unit.trim())) draft.unit = "USDC";
+    if (!draft.unit && draft.side) draft.unit = draft.side === "buy" ? "USDC" : symbol;
+    if (/\b(?:demo\s*usd|dusd|usdt|usdg|eth)\b/i.test(input)) draft.unit = "unsupported";
     save(draft);
     if (!symbol) return text(`Which stock: ${mainnetStockChoices()}?`);
     if (!draft.side && !draft.amount && name === "preview_mainnet_stock_price")
@@ -484,12 +484,12 @@ export async function runAssistantTool(
           const price = await mainnetReferencePrice(symbol);
           const indicative = (price.value * parseUnits(draft.desiredQuantity, 18)) / 10n ** 18n;
           const updated = new Date(price.asOf).toISOString().replace("T", " ").slice(0, 16);
-          value = ` Reference value: ≈ ${referenceDollars(indicative, price.decimals)} USD (${price.source}, updated ${updated} UTC${price.cachedFallback ? "; saved price, refresh unavailable" : ""}). This is not a USDG purchase quote.`;
+          value = ` Reference value: ≈ ${referenceDollars(indicative, price.decimals)} USD (${price.source}, updated ${updated} UTC${price.cachedFallback ? "; saved price, refresh unavailable" : ""}). This is not a USDC purchase quote.`;
         } catch {
           /* Preserve quantity intent even when a public quote is unavailable. */
         }
         return text(
-          `You want ${draft.desiredQuantity} ${symbol} tokens.${value}\n\nSteward buys by USDG budget, up to 1,000 USDG per trade. It cannot place an order for an exact token quantity.\n\nHow much USDG would you like to spend?`,
+          `You want ${draft.desiredQuantity} ${symbol} tokens.${value}\n\nPollenstock buys by USDC budget, up to 1,000 USDC per trade. It cannot place an order for an exact token quantity.\n\nHow much USDC would you like to spend?`,
         );
       }
     }
@@ -497,7 +497,7 @@ export async function runAssistantTool(
     if (!draft.amount)
       return text(
         draft.side === "buy"
-          ? "How much USDG would you like to spend?"
+          ? "How much USDC would you like to spend?"
           : `How many ${symbol} tokens would you like to sell?`,
       );
     if (draft.side === "sell" && /^(?:shares?|tokens?)$/i.test(draft.unit ?? "")) {
@@ -506,7 +506,7 @@ export async function runAssistantTool(
     }
     // "Sell 0.5 Microsoft" may arrive with the company name as the unit.
     if (draft.side === "sell" && mainnetStockForUnit(draft.unit) === symbol) draft.unit = symbol;
-    const expected = draft.side === "buy" ? "USDG" : symbol;
+    const expected = draft.side === "buy" ? "USDC" : symbol;
     if (draft.unit?.toUpperCase() !== expected) return text(`Enter the amount in ${expected}.`);
     const decimals = draft.side === "buy" ? 6 : 18;
     const plainAmount = new RegExp(`^(?:0|[1-9]\\d{0,29})(?:\\.\\d{1,${decimals}})?$`).test(
@@ -523,8 +523,8 @@ export async function runAssistantTool(
       save(draft);
       const limit =
         draft.side === "buy"
-          ? `Steward currently supports up to 1,000 USDG per stock purchase. What USDG budget would you like to use for ${symbol}?`
-          : `Steward currently supports selling up to 1,000 ${symbol} tokens per trade. How many would you like to sell?`;
+          ? `Pollenstock currently supports up to 1,000 USDC per stock purchase. What USDC budget would you like to use for ${symbol}?`
+          : `Pollenstock currently supports selling up to 1,000 ${symbol} tokens per trade. How many would you like to sell?`;
       return text(
         (inputAmount === undefined || inputAmount <= 0n
           ? `Enter a positive amount with at most ${decimals} decimal places.\n\n`
@@ -554,7 +554,7 @@ export async function runAssistantTool(
   if (name === "quote_stock") {
     if (/\b(?:mainnet|4663)\b/i.test(input))
       return text(
-        "This is a testnet quote tool. For mainnet, ask for a mainnet stock price preview in USDG.",
+        "This is a testnet quote tool. For mainnet, ask for a mainnet stock price preview in USDC.",
       );
     const a = z
       .object({
@@ -572,7 +572,7 @@ export async function runAssistantTool(
       return text("Which test stock do you mean: TSLA, AMD, NFLX or AMZN?");
     if ((a.amount && !amountLiteral(a.amount)) || (a.unit && !literal(a.unit)))
       return text(
-        "Please specify the amount and input token, for example ‘Buy Tesla with 2 USDG’.",
+        "Please specify the amount and input token, for example ‘Buy Tesla with 2 USDC’.",
       );
     const draft: Task = { ...(task?.kind === "stock" ? task : {}), kind: "stock", ...a };
     // A changed side or stock cannot silently inherit a previous input quantity/unit.
@@ -584,7 +584,7 @@ export async function runAssistantTool(
       draft.unit = a.unit;
     }
     // Require the user to restate units with a changed amount instead of reusing
-    // a prior USDG budget for a newly requested stock-token quantity.
+    // a prior USDC budget for a newly requested stock-token quantity.
     if (a.amount && !a.unit) draft.unit = undefined;
     if (/\b(?:demo\s*usd|dusd|usdc|usdt|dollars?|usd)\b/i.test(input)) {
       draft.unit = "unsupported";
@@ -596,10 +596,10 @@ export async function runAssistantTool(
     if (!draft.amount)
       return text(
         draft.side === "buy"
-          ? "How much test USDG would you spend? Include USDG with the amount. Demo USD is a different token."
+          ? "How much test USDC would you spend? Include USDC with the amount. Demo USD is a different token."
           : `How many ${draft.symbol} test tokens would you sell? Include ${draft.symbol} with the amount.`,
       );
-    const expected = draft.side === "buy" ? "USDG" : draft.symbol;
+    const expected = draft.side === "buy" ? "USDC" : draft.symbol;
     if (!draft.unit || draft.unit.toUpperCase() !== expected)
       return text(
         `For this ${draft.side} estimate, give the input amount in ${expected}, for example ‘2 ${expected}’. Demo USD and real dollars are not converted automatically. Trading is not enabled yet.`,
@@ -623,9 +623,7 @@ export async function runAssistantTool(
     if (!c)
       return text("I couldn’t find that saved contact. Check the name or open Manage contacts.");
     if (name === "find_contact")
-      return text(
-        `${c.name}\n${c.address}\nVerify this address on Robinhood mainnet before sending.`,
-      );
+      return text(`${c.name}\n${c.address}\nVerify this address on Arc before sending.`);
     if (!/\b(?:delete|remove|forget)\b/i.test(input))
       return text("To remove a contact, tell me which saved contact you want to delete.");
     clear();
@@ -640,7 +638,7 @@ export async function runAssistantTool(
     if (!wallet) return text("Ask for your receiving address to set up your mainnet wallet.");
     const [balance, eth] = await Promise.all([
       mainnetRpc.readContract({
-        address: MAINNET_USDG.address,
+        address: MAINNET_QUOTE.address,
         abi: erc20Abi,
         functionName: "balanceOf",
         args: [wallet.address as `0x${string}`],
@@ -648,7 +646,7 @@ export async function runAssistantTool(
       mainnetRpc.getBalance({ address: wallet.address as `0x${string}` }),
     ]);
     return text(
-      `${balance >= parseUnits(a.amount, 6) ? "Your USDG covers" : "Your USDG does not cover"} ${a.amount} USDG.\nBalance: ${formatUnits(balance, 6)} USDG\nGas balance: ${formatEther(eth)} ETH\nFees are checked at review. Nothing sent.`,
+      `${balance >= parseUnits(a.amount, 6) ? "Your USDC covers" : "Your USDC does not cover"} ${a.amount} USDC.\nBalance: ${formatUnits(balance, 6)} USDC\nUSDC also pays the network fee, so keep a few cents extra. Fees are checked at review. Nothing sent.`,
     );
   }
   if (name === "prepare_contact") {
@@ -663,8 +661,7 @@ export async function runAssistantTool(
     const draft: Task = { ...(task?.kind === "contact" ? task : {}), kind: "contact", ...a };
     save(draft);
     if (!draft.name) return text("What name should I save this contact under?");
-    if (!draft.address)
-      return text(`What is ${draft.name}’s full 0x wallet address on Robinhood mainnet?`);
+    if (!draft.address) return text(`What is ${draft.name}’s full 0x wallet address on Arc?`);
     if (
       draft.name.length > 24 ||
       !/[\p{L}]/u.test(draft.name) ||
@@ -711,11 +708,9 @@ export async function runAssistantTool(
     .parse(args);
   if (!/\b(?:testnet|demo\s*usd|dusd|46630)\b/i.test(input) && task?.kind !== "payment") {
     if ((a.recipient && !literal(a.recipient)) || (a.amount && !amountLiteral(a.amount)))
-      return text("Please give the recipient and exact USDG amount.");
-    if (/\b(?:usdc|usdt|eth|btc|eur|gbp)\b/i.test(input))
-      return text(
-        "Payments support USDG on Robinhood mainnet. What USDG amount would you like to send?",
-      );
+      return text("Please give the recipient and exact USDC amount.");
+    if (/\b(?:usdt|usdg|eth|btc|eur|gbp)\b/i.test(input))
+      return text("Payments support USDC on Arc. What USDC amount would you like to send?");
     const draft: Task = {
       ...(task?.kind === "mainnet_payment" ? task : {}),
       kind: "mainnet_payment",
@@ -731,9 +726,9 @@ export async function runAssistantTool(
     save(draft);
     if (!draft.recipient)
       return text(
-        "Who should receive USDG? Give a saved name, full international phone number or wallet address.",
+        "Who should receive USDC? Give a saved name, full international phone number or wallet address.",
       );
-    if (!draft.amount) return text("How much USDG would you like to send?");
+    if (!draft.amount) return text("How much USDC would you like to send?");
     return mainnetPaymentReview(db, key, account, phone, messageId, draft.recipient, draft.amount);
   }
   if (task?.kind !== "payment" && !/\b(?:send|pay|transfer|give)\b/i.test(input))

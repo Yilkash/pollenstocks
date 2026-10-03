@@ -1,5 +1,5 @@
 export const actions = [
-  ["chat", "Ask Steward"],
+  ["chat", "Ask Pollenstock"],
   ["create", "Create account"],
   ["balance", "View balance"],
   ["send", "Send payment"],
@@ -10,13 +10,13 @@ export const actions = [
 ] as const;
 export const text = (body: string) => ({ type: "text", text: { body } });
 export const capabilities = [
-  "Hi, I’m Steward 👋",
+  "Hi, I’m Pollenstock 👋",
   "",
   "💸 Send, receive and check balances",
   "📋 Track payments and manage contacts",
   "📈 Buy, sell and track stock tokens",
   "",
-  "Payments use USDG on Robinhood mainnet.",
+  "Payments use USDC on Arc.",
   "Payments and trades require confirmation.",
 ].join("\n");
 export function onboardingWelcome() {
@@ -25,7 +25,7 @@ export function onboardingWelcome() {
     interactive: {
       type: "button",
       body: {
-        text: "Hi, I’m Steward 👋\nSend USDG, check balances and trade stock tokens on Robinhood mainnet.\n\nCreate your account to begin. Mainnet transactions use real assets.",
+        text: "Hi, I’m Pollenstock 👋\nSend USDC, check balances and trade stock tokens on Arc.\n\nCreate your account to begin. Mainnet transactions use real assets.",
       },
       action: {
         buttons: [{ type: "reply", reply: { id: "menu:create", title: "Create account" } }],
@@ -42,14 +42,14 @@ export function menu(hasAccount = false) {
         text:
           capabilities +
           (hasAccount
-            ? "\n\nChoose a shortcut, or Ask Steward to chat. OpenServ processes chat messages, recent context and task details."
+            ? "\n\nChoose a shortcut, or Ask Pollenstock to chat. OpenServ processes chat messages, recent context and task details."
             : "\n\nChoose Create account to begin."),
       },
       action: {
         button: "Open menu",
         sections: [
           {
-            title: "Steward",
+            title: "Pollenstock",
             rows: actions.map(([id, title]) => ({
               id: "menu:" + id,
               title: id === "create" && hasAccount ? "My account" : title,
@@ -87,16 +87,17 @@ export function reply(input: string) {
   const action = actionFor(input);
   if (action === "create")
     return text(
-      "Create your Steward account to get a mainnet wallet. Transactions require your confirmation. Type Menu to begin.",
+      "Create your Pollenstock account to get a mainnet wallet. Transactions require your confirmation. Type Menu to begin.",
     );
   if (action === "help" || command === "help")
     return text(
-      "Help\n\n• Payments: review, then confirm.\n• Contacts: save names and addresses.\n• Phone payments: recipient lookup must be enabled.\n• Limits: 1,000 USDG per payment.\n\nMainnet payments use real USDG. Never share wallet secrets.\nType Menu to return.",
+      "Help\n\n• Payments: review, then confirm.\n• Contacts: save names and addresses.\n• Phone payments: recipient lookup must be enabled.\n• Limits: 1,000 USDC per payment.\n\nMainnet payments use real USDC. Never share wallet secrets.\nType Menu to return.",
     );
-  if (action === "chat") return text("Create your account first, then choose Ask Steward to chat.");
+  if (action === "chat")
+    return text("Create your account first, then choose Ask Pollenstock to chat.");
   if (action)
     return text(
-      "This feature needs a Steward wallet. Wallet setup is not available yet, and no payment has been prepared or sent. Type Menu to return.",
+      "This feature needs a Pollenstock wallet. Wallet setup is not available yet, and no payment has been prepared or sent. Type Menu to return.",
     );
   return menu();
 }

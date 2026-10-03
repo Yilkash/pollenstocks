@@ -1,5 +1,11 @@
 import { formatEther, formatUnits } from "viem";
-import { MAINNET_ASSETS, type MainnetStock } from "../networks/robinhood";
+import {
+  MAINNET_ASSETS,
+  MAINNET_NATIVE_SYMBOL,
+  MAINNET_NETWORK_NAME,
+  MAINNET_QUOTE,
+  type MainnetStock,
+} from "../networks/chain";
 import type { MainnetPlan } from "./mainnet-trade";
 
 // BigInt only: abbreviated outputs round down, displayed fee ceilings round up.
@@ -18,22 +24,17 @@ export function mainnetTradeReviewText(p: MainnetPlan) {
   const buy = p.side === "buy",
     inputDecimals = buy ? 6 : 18,
     outputDecimals = buy ? 18 : 6;
-  const inputUnit = buy ? "USDG" : `${p.symbol} tokens`,
-    outputUnit = buy ? `${p.symbol} tokens` : "USDG";
+  const inputUnit = buy ? MAINNET_QUOTE.symbol : `${p.symbol} tokens`,
+    outputUnit = buy ? `${p.symbol} tokens` : MAINNET_QUOTE.symbol;
   const company = MAINNET_ASSETS[p.symbol as MainnetStock].name;
   return [
     `*${buy ? "Buy" : "Sell"} ${company} (${p.symbol})*`,
-    "Robinhood mainnet",
+    MAINNET_NETWORK_NAME,
     "",
     `${buy ? "Pay" : "Sell"}: ${formatUnits(BigInt(p.amountIn), inputDecimals)} ${inputUnit}`,
     `Receive: ≈ ${shortAmount(p.expectedOutput, outputDecimals)} ${outputUnit}`,
     `Minimum: ${shortAmount(p.minimumOutput, outputDecimals)} ${outputUnit}`,
-    ...(p.providerFee
-      ? [
-          `LI.FI fee: ${formatUnits(BigInt(p.providerFee.amount), inputDecimals)} ${buy ? "USDG" : p.symbol} (included)`,
-        ]
-      : []),
-    `Network fee: up to ${shortAmount(feeCeiling(p).toString(), 18, true)} ETH`,
+    `Network fee: up to ${shortAmount(feeCeiling(p).toString(), 18, true)} ${MAINNET_NATIVE_SYMBOL}`,
     `Expires: ${expiry(p)}`,
     "",
     "Includes token approval. Failed trades may still cost gas.",
@@ -45,19 +46,14 @@ export function mainnetTradeDetailsText(p: MainnetPlan) {
     outputDecimals = buy ? 18 : 6;
   return [
     `*${buy ? "Buy" : "Sell"} ${p.symbol} · Details*`,
-    `Provider: ${p.provider === "lifi" ? "LI.FI" : "KyberSwap"}`,
-    `Input: ${formatUnits(BigInt(p.amountIn), inputDecimals)} ${buy ? "USDG" : p.symbol}`,
-    `Estimated receive: ${formatUnits(BigInt(p.expectedOutput), outputDecimals)} ${buy ? p.symbol : "USDG"}`,
-    `Minimum receive: ${formatUnits(BigInt(p.minimumOutput), outputDecimals)} ${buy ? p.symbol : "USDG"}`,
+    "Provider: KyberSwap",
+    `Input: ${formatUnits(BigInt(p.amountIn), inputDecimals)} ${buy ? MAINNET_QUOTE.symbol : p.symbol}`,
+    `Estimated receive: ${formatUnits(BigInt(p.expectedOutput), outputDecimals)} ${buy ? p.symbol : MAINNET_QUOTE.symbol}`,
+    `Minimum receive: ${formatUnits(BigInt(p.minimumOutput), outputDecimals)} ${buy ? p.symbol : MAINNET_QUOTE.symbol}`,
     "Price tolerance: 1%",
     "",
-    ...(p.providerFee
-      ? [
-          `Provider fee: ${formatUnits(BigInt(p.providerFee.amount), inputDecimals)} ${buy ? "USDG" : p.symbol} (included in input)`,
-        ]
-      : []),
-    `Estimated network fee: ${formatEther(BigInt(p.estimatedFee ?? feeCeiling(p).toString()))} ETH`,
-    `Maximum network fee: ${formatEther(feeCeiling(p))} ETH`,
+    `Estimated network fee: ${formatEther(BigInt(p.estimatedFee ?? feeCeiling(p).toString()))} ${MAINNET_NATIVE_SYMBOL}`,
+    `Maximum network fee: ${formatEther(feeCeiling(p))} ${MAINNET_NATIVE_SYMBOL}`,
     "Network fees cover approvals and swap; you pay only gas used.",
     `Expires: ${expiry(p)}`,
     "",

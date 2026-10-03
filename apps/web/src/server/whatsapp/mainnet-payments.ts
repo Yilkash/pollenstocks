@@ -7,7 +7,7 @@ import { normalizePhone } from "./phone-recipients";
 import { mainnetTradeReviewReply, mainnetTradeStatusReply } from "../stocks/mainnet-orders";
 import { ensureMainnetWallet } from "../stocks/mainnet-wallet";
 import { mainnetReceiveReply, mainnetPortfolioReply } from "./mainnet-stocks";
-import { MAINNET_USDG } from "../networks/robinhood";
+import { MAINNET_QUOTE, MAINNET_STOCK_SYMBOLS } from "../networks/chain";
 
 type Draft = { recipient?: string; amount?: string };
 export function migrateMainnetPayments(db: DatabaseSync) {
@@ -33,18 +33,18 @@ export function mainnetPaymentEntry(
   const draft: Draft = start ? {} : unseal<Draft>(row!.payload, key);
   if (!start) {
     if (!draft.recipient) draft.recipient = input.trim();
-    else draft.amount = input.trim().replace(/\s*USDG$/i, "");
+    else draft.amount = input.trim().replace(/\s*USDC$/i, "");
   }
   if (draft.amount && !/^(?:0|[1-9]\d{0,3})(?:\.\d{1,6})?$/.test(draft.amount))
-    return text("Enter a USDG amount, for example 0.5. Type Cancel to stop.");
+    return text("Enter a USDC amount, for example 0.5. Type Cancel to stop.");
   db.prepare(
     "INSERT OR REPLACE INTO wa_mainnet_payment_drafts(account_id,payload,expires) VALUES(?,?,?)",
   ).run(account, seal(draft, key), Date.now() + 600000);
   if (!draft.recipient)
     return text(
-      "Who should receive USDG on Robinhood mainnet? Enter a wallet address, saved contact name or full international phone number.",
+      "Who should receive USDC on Arc? Enter a wallet address, saved contact name or full international phone number.",
     );
-  if (!draft.amount) return text("How much USDG would you like to send?");
+  if (!draft.amount) return text("How much USDC would you like to send?");
   return {
     _steward_type: "mainnet_action",
     action: "send",
@@ -94,7 +94,7 @@ export async function mainnetPaymentReview(
   if (
     !address ||
     !isAddress(address) ||
-    [zeroAddress, MAINNET_USDG.address].some((a) => a.toLowerCase() === address!.toLowerCase())
+    [zeroAddress, MAINNET_QUOTE.address].some((a) => a.toLowerCase() === address!.toLowerCase())
   ) {
     db.prepare("DELETE FROM wa_mainnet_payment_drafts WHERE account_id=?").run(account);
     return text(
@@ -112,7 +112,7 @@ export async function mainnetPaymentReview(
     account,
     phone,
     messageId,
-    "AAPL",
+    MAINNET_STOCK_SYMBOLS[0], // placeholder: payments trade no stock
     "buy",
     amount,
     getAddress(address),
@@ -132,11 +132,11 @@ export async function mainnetAction(
   const account = db
     .prepare("SELECT id FROM wa_accounts WHERE sender=? AND status='active'")
     .get(senderLookup(phone, key)) as { id: string } | undefined;
-  if (!account) return text("Create your Steward account first.");
+  if (!account) return text("Create your Pollenstock account first.");
   if (action === "receive") return mainnetReceiveReply(db, account.id);
   if (action === "balance") return mainnetPortfolioReply(db, account.id);
   if (action === "history") return mainnetTradeStatusReply(db, account.id);
   if (action === "send" && recipient && amount)
     return mainnetPaymentReview(db, key, account.id, phone, messageId, recipient, amount);
-  return text("Choose Send payment to prepare a USDG transfer.");
+  return text("Choose Send payment to prepare a USDC transfer.");
 }

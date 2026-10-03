@@ -1,12 +1,4 @@
 import { prepareMainnetQuote } from "./mainnet-quote";
-import {
-  LIFI_ROUTER,
-  LIFI_FACET,
-  LIFI_SELECTOR,
-  LIFI_CODE_PINS,
-  lifiLoupeAbi,
-  validateLifiCall,
-} from "./lifi-contracts";
 import { randomUUID } from "node:crypto";
 import {
   createPublicClient,
@@ -29,15 +21,18 @@ import {
 } from "viem";
 import {
   MAINNET_ASSETS,
-  MAINNET_USDG,
-  robinhoodMainnet,
+  MAINNET_CHAIN_ID,
+  MAINNET_QUOTE,
+  NATIVE_PER_QUOTE_UNIT,
+  mainnetChain,
   type MainnetStock,
-} from "../networks/robinhood";
+} from "../networks/chain";
+import { fairPriceCheck } from "./reference-price";
 import { verifiedMainnetRegistry } from "./mainnet";
 
 export const mainnetRpc = createPublicClient({
-  chain: robinhoodMainnet,
-  transport: http(robinhoodMainnet.rpcUrls.default.http[0], {
+  chain: mainnetChain,
+  transport: http(mainnetChain.rpcUrls.default.http[0], {
     timeout: 10000,
     retryCount: 1,
     retryDelay: 300,
@@ -76,8 +71,7 @@ export function executionGasLimit(
 // Gas price to broadcast with. The base fee can tick up between reading it and inclusion,
 // and a bid below the new base fee is rejected ("max fee per gas less than block base
 // fee"), so bid 5% above the current price. Never exceed the price ceiling the user
-// confirmed. On Arbitrum chains the sender pays the block base fee, not the bid, and the
-// gas-limit check below bounds the worst case by the confirmed fee at this bid.
+// confirmed; the gas-limit check below bounds the worst case by the confirmed fee.
 export function broadcastGasPrice(suggested: bigint, baseFee: bigint, ceiling: bigint) {
   const current = suggested > baseFee ? suggested : baseFee;
   const bid = (current * 105n + 99n) / 100n;
@@ -89,7 +83,7 @@ export function mainnetTradeConfig() {
   const executorHash = process.env.MAINNET_KYBER_EXECUTOR_CODEHASH?.trim();
   const routerHash = process.env.MAINNET_ROUTER_CODEHASH?.trim();
   const policy = process.env.PRIVY_MAINNET_POLICY_ID?.trim();
-  const maxInput = process.env.MAINNET_MAX_USDG_PER_TRADE?.trim();
+  const maxInput = process.env.MAINNET_MAX_USDC_PER_TRADE?.trim();
   const maxFees = process.env.MAINNET_MAX_FEE_WEI?.trim();
   requireTrade(
     executor &&
@@ -108,14 +102,15 @@ export function mainnetTradeConfig() {
   requireTrade(
     inputCap > 0n &&
       inputCap <= 1000_000000n &&
-      (feeCap === undefined || feeCap <= 1000000000000000n),
+      // Arc gas is USDC in 18-decimal native units: 0.1 USDC per trade at most.
+      (feeCap === undefined || feeCap <= 100000000000000000n),
     "mainnet_limits_invalid",
   );
   return { executor: getAddress(executor), executorHash, routerHash, policy, inputCap, feeCap };
 }
 export async function checkMainnetRouter() {
   const c = mainnetTradeConfig();
-  requireTrade((await mainnetRpc.getChainId()) === 4663);
+  requireTrade((await mainnetRpc.getChainId()) === MAINNET_CHAIN_ID);
   const block = await mainnetRpc.getBlock();
   requireTrade(Math.abs(Date.now() - Number(block.timestamp) * 1000) < 120000);
   const [executorCode, routerCode] = await Promise.all([
@@ -129,32 +124,13 @@ export async function checkMainnetRouter() {
   );
   return c;
 }
-export async function checkLifiRouter() {
-  requireTrade(process.env.MAINNET_LIFI_FALLBACK_ENABLED === "true", "lifi_disabled");
-  const facet = await mainnetRpc.readContract({
-    address: LIFI_ROUTER,
-    abi: lifiLoupeAbi,
-    functionName: "facetAddress",
-    args: [LIFI_SELECTOR],
-  });
-  requireTrade(sameAddress(facet, LIFI_FACET), "lifi_facet_changed");
-  await Promise.all(
-    LIFI_CODE_PINS.map(async ([address, hash]) => {
-      const code = await mainnetRpc.getCode({ address });
-      requireTrade(code && code !== "0x" && keccak256(code) === hash, "lifi_contract_code_changed");
-    }),
-  );
-}
 export type MainnetPlan = {
-  // Undefined identifies existing encrypted Kyber reviews.
-  provider?: "kyber" | "lifi";
-  providerFee?: { amount: string; token: Address };
-  providerTransactionId?: Hex;
+  provider?: "kyber";
   id: string;
   orderId: Hex;
   wallet: Address;
   router: Address;
-  symbol: MainnetStock | "USDG";
+  symbol: MainnetStock | typeof MAINNET_QUOTE.symbol;
   transferTo?: Address;
   side: "buy" | "sell" | "send";
   inputToken: Address;
@@ -183,8 +159,8 @@ export async function prepareMainnetPlan(
   const c = await checkMainnetRouter();
   await verifiedMainnetRegistry();
   const stock = MAINNET_ASSETS[symbol];
-  const input = side === "buy" ? MAINNET_USDG : stock,
-    output = side === "buy" ? stock : MAINNET_USDG;
+  const input = side === "buy" ? MAINNET_QUOTE : stock,
+    output = side === "buy" ? stock : MAINNET_QUOTE;
   requireTrade(
     new RegExp(`^(?:0|[1-9]\\d{0,3})(?:\\.\\d{1,${input.decimals}})?$`).test(amount),
     "invalid_amount",
@@ -198,11 +174,12 @@ export async function prepareMainnetPlan(
     outputToken: output.address,
     amountIn: amountIn.toString(),
   });
-  if (quote.provider === "lifi") await checkLifiRouter();
   const expected = BigInt(quote.expectedOutput),
     minimum = BigInt(quote.minimumOutput),
     deadline = quote.deadline;
   requireTrade(minimum > 0n && (side !== "sell" || expected <= c.inputCap));
+  // Refuse a route far from the real market (thin pools, copycat liquidity).
+  await fairPriceCheck(symbol, side, amountIn, expected);
   const [balance, eth, allowance, suggestedPrice, decimals, block] = await Promise.all([
     mainnetRpc.readContract({
       address: input.address,
@@ -223,7 +200,7 @@ export async function prepareMainnetPlan(
   ]);
   requireTrade(decimals === input.decimals && balance >= amountIn, "insufficient_tokens");
   const id = randomUUID(),
-    orderId = keccak256(toBytes(`steward-mainnet-v1:${wallet.toLowerCase()}:${id}`));
+    orderId = keccak256(toBytes(`pollenstock-arc-v1:${wallet.toLowerCase()}:${id}`));
   const steps: MainnetPlan["steps"] = [];
   requireTrade(
     typeof block.baseFeePerGas === "bigint" && block.baseFeePerGas >= 0n && suggestedPrice > 0n,
@@ -277,15 +254,15 @@ export async function prepareMainnetPlan(
   });
   const fee = steps.reduce((sum, step) => sum + BigInt(step.gas) * BigInt(step.gasPrice), 0n);
   requireTrade(c.feeCap === undefined || fee <= c.feeCap, "operator_fee_limit_exceeded");
-  requireTrade(eth >= fee, "insufficient_eth_for_network_fee");
+  // Arc pays gas in USDC: a buy spends USDC for the trade and the fee from one balance.
+  const spend = side === "buy" ? amountIn * NATIVE_PER_QUOTE_UNIT : 0n;
+  requireTrade(eth >= fee + spend, "insufficient_eth_for_network_fee");
   const plan = {
     id,
     orderId,
     wallet,
     router: quote.router,
     provider: quote.provider,
-    providerFee: quote.providerFee,
-    providerTransactionId: quote.providerTransactionId,
     symbol,
     side,
     inputToken: input.address,
@@ -316,7 +293,7 @@ export async function prepareMainnetTransfer(
   });
   const [balance, eth, suggestedPrice, decimals, simulated, block] = await Promise.all([
     mainnetRpc.readContract({
-      address: MAINNET_USDG.address,
+      address: MAINNET_QUOTE.address,
       abi: erc20Abi,
       functionName: "balanceOf",
       args: [wallet],
@@ -324,13 +301,13 @@ export async function prepareMainnetTransfer(
     mainnetRpc.getBalance({ address: wallet }),
     mainnetRpc.getGasPrice(),
     mainnetRpc.readContract({
-      address: MAINNET_USDG.address,
+      address: MAINNET_QUOTE.address,
       abi: erc20Abi,
       functionName: "decimals",
     }),
     mainnetRpc.simulateContract({
       account: wallet,
-      address: MAINNET_USDG.address,
+      address: MAINNET_QUOTE.address,
       abi: erc20Abi,
       functionName: "transfer",
       args: [recipient, amountIn],
@@ -341,7 +318,7 @@ export async function prepareMainnetTransfer(
   requireTrade(decimals === 6 && simulated.result === true);
   const gas = await mainnetRpc.estimateGas({
     account: wallet,
-    to: MAINNET_USDG.address,
+    to: MAINNET_QUOTE.address,
     data,
     value: 0n,
   });
@@ -353,18 +330,21 @@ export async function prepareMainnetTransfer(
   requireTrade(gas > 0n && gas <= 200000n);
   const gasLimit = (gas * 125n + 99n) / 100n,
     ceiling = (price * 125n + 99n) / 100n;
-  requireTrade(eth >= gasLimit * ceiling, "insufficient_eth_for_network_fee");
+  requireTrade(
+    eth >= gasLimit * ceiling + amountIn * NATIVE_PER_QUOTE_UNIT,
+    "insufficient_eth_for_network_fee",
+  );
   const id = randomUUID();
   const plan: MainnetPlan = {
     id,
-    orderId: keccak256(toBytes(`steward-mainnet-v1:${wallet.toLowerCase()}:${id}`)),
+    orderId: keccak256(toBytes(`pollenstock-arc-v1:${wallet.toLowerCase()}:${id}`)),
     wallet,
     router: KYBER_ROUTER,
-    symbol: "USDG",
+    symbol: MAINNET_QUOTE.symbol,
     side: "send",
     transferTo: recipient,
-    inputToken: MAINNET_USDG.address,
-    outputToken: MAINNET_USDG.address,
+    inputToken: MAINNET_QUOTE.address,
+    outputToken: MAINNET_QUOTE.address,
     amountIn: amountIn.toString(),
     expectedOutput: amountIn.toString(),
     minimumOutput: amountIn.toString(),
@@ -373,7 +353,7 @@ export async function prepareMainnetTransfer(
     steps: [
       {
         kind: "transfer",
-        to: MAINNET_USDG.address,
+        to: MAINNET_QUOTE.address,
         data,
         gas: gasLimit.toString(),
         gasPrice: ceiling.toString(),
@@ -384,26 +364,25 @@ export async function prepareMainnetTransfer(
   return plan;
 }
 export function validateMainnetPlan(p: MainnetPlan) {
-  requireTrade(p.provider === undefined || p.provider === "kyber" || p.provider === "lifi");
-  if (p.provider !== "lifi")
-    requireTrade(p.providerFee === undefined && p.providerTransactionId === undefined);
+  requireTrade(p.provider === undefined || p.provider === "kyber");
   if (p.side === "send") {
-    requireTrade(p.provider !== "lifi");
     const c = mainnetTradeConfig(),
       recipient = p.transferTo;
-    requireTrade(p.symbol === "USDG" && isAddress(p.wallet) && recipient && isAddress(recipient));
+    requireTrade(
+      p.symbol === MAINNET_QUOTE.symbol && isAddress(p.wallet) && recipient && isAddress(recipient),
+    );
     requireTrade(
       ![
         zeroAddress,
         p.wallet,
-        MAINNET_USDG.address,
+        MAINNET_QUOTE.address,
         KYBER_ROUTER,
         ...Object.values(MAINNET_ASSETS).map((a) => a.address),
       ].some((a) => sameAddress(a, recipient)),
     );
     requireTrade(
       /^[a-f0-9-]{36}$/.test(p.id) &&
-        p.orderId === keccak256(toBytes(`steward-mainnet-v1:${p.wallet.toLowerCase()}:${p.id}`)),
+        p.orderId === keccak256(toBytes(`pollenstock-arc-v1:${p.wallet.toLowerCase()}:${p.id}`)),
     );
     requireTrade(Number.isSafeInteger(p.deadline) && p.deadline > 0 && p.steps.length === 1);
     requireTrade(
@@ -413,12 +392,12 @@ export function validateMainnetPlan(p: MainnetPlan) {
     );
     requireTrade(p.expectedOutput === p.amountIn && p.minimumOutput === p.amountIn);
     requireTrade(
-      sameAddress(p.inputToken, MAINNET_USDG.address) &&
-        sameAddress(p.outputToken, MAINNET_USDG.address) &&
+      sameAddress(p.inputToken, MAINNET_QUOTE.address) &&
+        sameAddress(p.outputToken, MAINNET_QUOTE.address) &&
         sameAddress(p.router, KYBER_ROUTER),
     );
     const step = p.steps[0];
-    requireTrade(step.kind === "transfer" && sameAddress(step.to, MAINNET_USDG.address));
+    requireTrade(step.kind === "transfer" && sameAddress(step.to, MAINNET_QUOTE.address));
     requireTrade(
       /^[1-9]\d{0,9}$/.test(step.gas) &&
         BigInt(step.gas) <= 250000n &&
@@ -439,25 +418,24 @@ export function validateMainnetPlan(p: MainnetPlan) {
   }
   const c = mainnetTradeConfig(),
     stock = MAINNET_ASSETS[p.symbol as MainnetStock];
-  const router = p.provider === "lifi" ? LIFI_ROUTER : KYBER_ROUTER;
+  const router = KYBER_ROUTER;
   requireTrade(stock && ["buy", "sell"].includes(p.side) && isAddress(p.wallet));
   requireTrade(
     /^[a-f0-9-]{36}$/.test(p.id) &&
-      p.orderId === keccak256(toBytes(`steward-mainnet-v1:${p.wallet.toLowerCase()}:${p.id}`)),
+      p.orderId === keccak256(toBytes(`pollenstock-arc-v1:${p.wallet.toLowerCase()}:${p.id}`)),
   );
   requireTrade(Number.isSafeInteger(p.deadline) && p.deadline > 0);
   requireTrade(BigInt(p.amountIn) <= (p.side === "buy" ? 1000_000000n : 1000n * 10n ** 18n));
   requireTrade(
     sameAddress(p.router, router) &&
-      sameAddress(p.inputToken, p.side === "buy" ? MAINNET_USDG.address : stock.address) &&
-      sameAddress(p.outputToken, p.side === "buy" ? stock.address : MAINNET_USDG.address),
+      sameAddress(p.inputToken, p.side === "buy" ? MAINNET_QUOTE.address : stock.address) &&
+      sameAddress(p.outputToken, p.side === "buy" ? stock.address : MAINNET_QUOTE.address),
   );
   requireTrade(
     BigInt(p.amountIn) > 0n &&
       BigInt(p.minimumOutput) > 0n &&
       BigInt(p.minimumOutput) >= (BigInt(p.expectedOutput) * 99n) / 100n &&
-      BigInt(p.minimumOutput) <=
-        (BigInt(p.expectedOutput) * 99n) / 100n + (p.provider === "lifi" ? 1n : 0n),
+      BigInt(p.minimumOutput) <= (BigInt(p.expectedOutput) * 99n) / 100n,
   );
   requireTrade((p.side === "buy" ? BigInt(p.amountIn) : BigInt(p.expectedOutput)) <= c.inputCap);
   requireTrade(p.steps.length === 2 || p.steps.length === 3);
@@ -479,14 +457,7 @@ export function validateMainnetPlan(p: MainnetPlan) {
       );
     } else {
       requireTrade(sameAddress(step.to, router));
-      if (p.provider === "lifi") {
-        requireTrade(process.env.MAINNET_LIFI_FALLBACK_ENABLED === "true", "lifi_disabled");
-        requireTrade(p.providerFee && p.providerTransactionId);
-        validateLifiCall(
-          { ...p, providerFee: p.providerFee, providerTransactionId: p.providerTransactionId },
-          step.data,
-        );
-      } else validateRouterCall(p, step.data);
+      validateRouterCall(p, step.data);
     }
   });
   requireTrade(c.feeCap === undefined || fees <= c.feeCap);

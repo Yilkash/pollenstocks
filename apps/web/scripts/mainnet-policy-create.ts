@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { PrivyClient } from "@privy-io/node";
+import { mainnetPolicyRules } from "../src/server/stocks/mainnet-policy";
 type PolicyCreateParams = Parameters<ReturnType<PrivyClient["policies"]>["create"]>[0];
 
 // Explicit setup command only. Creates an unattached policy; never sends a transaction.
@@ -14,7 +15,13 @@ async function main() {
     console.log("Mainnet policy already configured; no changes made.");
     return;
   }
-  const raw = readFileSync(resolve("../../docs/privy-mainnet-policy.json"), "utf8");
+  // The policy is generated from the configured Arc token list (stock tokens + USDC).
+  const raw = JSON.stringify({
+    name: "Pollenstock Arc trades",
+    version: "1.0",
+    chain_type: "ethereum",
+    rules: mainnetPolicyRules(),
+  });
   const template = JSON.parse(raw) as PolicyCreateParams;
   const digest = createHash("sha256")
     .update(appId + owner + raw)
@@ -44,7 +51,7 @@ async function main() {
     const policy = await client.policies().create({
       ...template,
       owner_id: owner,
-      idempotency_key: `steward-mainnet-policy-${digest}`,
+      idempotency_key: `pollenstock-arc-policy-${digest}`,
     });
     state.id = policy.id;
     writeFileSync(statePath, JSON.stringify(state), { mode: 0o600 });
@@ -69,6 +76,17 @@ main().catch((error: unknown) => {
   if (typeof e.status === "number") console.error("Provider HTTP status:", e.status);
   if (typeof e.error?.code === "string" && /^[a-zA-Z0-9_ -]{1,100}$/.test(e.error.code))
     console.error("Provider error code:", e.error.code);
+  // Our own setup checks throw short snake_case codes.
+  if (
+    typeof e.status !== "number" &&
+    error instanceof Error &&
+    /^[a-z_]{1,60}$/.test(error.message)
+  )
+    console.error("Setup check:", error.message);
+  // Validation messages describe the rejected field; they never contain credentials.
+  const detail = (error as { message?: unknown }).message;
+  if (typeof e.status === "number" && typeof detail === "string")
+    console.error("Provider message:", detail.replace(/[^\x20-\x7e]/g, "").slice(0, 600));
   console.error(
     "Policy setup did not finish. No transactions were submitted. If .mainnet-policy-setup.json has no ID, check Privy before retrying; the request may have succeeded.",
   );

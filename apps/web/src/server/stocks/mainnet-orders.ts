@@ -11,8 +11,7 @@ import {
   validateMainnetPlan,
   type MainnetPlan,
 } from "./mainnet-trade";
-import { MAINNET_EXECUTION_READY, type MainnetStock } from "../networks/robinhood";
-import { gasTopupConfig, GAS_TOPUP_DEFAULT_WEI, welcomeGasTopup } from "./gas-topup";
+import { MAINNET_EXECUTION_READY, type MainnetStock } from "../networks/chain";
 export const orderDigest = (s: string) => createHash("sha256").update(s).digest("hex");
 export type MainnetWallet = {
   account_id: string;
@@ -46,14 +45,6 @@ export function migrateMainnetOrders(db: DatabaseSync) {
   CREATE UNIQUE INDEX IF NOT EXISTS wa_mainnet_one_active ON wa_mainnet_orders(account_id) WHERE state IN ('review','queued','running','unknown');
   CREATE TABLE IF NOT EXISTS wa_mainnet_steps(order_id TEXT NOT NULL,position INTEGER NOT NULL,state TEXT NOT NULL,reference_id TEXT NOT NULL UNIQUE,idempotency_key TEXT NOT NULL UNIQUE,nonce INTEGER,tx_hash TEXT,PRIMARY KEY(order_id,position));`);
 }
-const topupNote = () =>
-  `🎁 Welcome gift: I added ${formatEther(gasTopupConfig()?.amount ?? GAS_TOPUP_DEFAULT_WEI)} ETH to your wallet to cover network fees for your first few trades.`;
-function withNote<T>(reply: T, note: string): T {
-  const r = reply as { text?: { body: string }; interactive?: { body?: { text: string } } };
-  if (r.text) r.text.body = `${note}\n\n${r.text.body}`;
-  else if (r.interactive?.body) r.interactive.body.text = `${note}\n\n${r.interactive.body.text}`;
-  return reply;
-}
 export function mainnetWallet(db: DatabaseSync, account: string) {
   return db
     .prepare(
@@ -83,8 +74,7 @@ export async function mainnetTradeReviewReply(
   side: "buy" | "sell",
   amount: string,
   transferTo?: `0x${string}`,
-  afterTopup = false,
-): Promise<ReturnType<typeof text> | { type: "interactive"; interactive: unknown }> {
+) {
   if (!MAINNET_EXECUTION_READY || process.env.MAINNET_STOCK_TRADING_ENABLED !== "true")
     return text("Mainnet trading setup is still pending. You can request a price preview now.");
   const wallet = mainnetWallet(db, account);
@@ -154,7 +144,7 @@ export async function mainnetTradeReviewReply(
         type: "button",
         body: {
           text: transferTo
-            ? `Review payment · Robinhood mainnet\n\nSend: ${formatUnits(BigInt(plan.amountIn), 6)} USDG\nTo: ${transferTo}\nEstimated network fee: ${formatEther(BigInt(plan.estimatedFee!))} ETH\nMaximum network fee: ${formatEther(fee)} ETH\nExpires: ${new Date(plan.deadline * 1000).toISOString().slice(11, 19)} UTC\n\nConfirm sends real USDG to this address.`
+            ? `Review payment · Arc\n\nSend: ${formatUnits(BigInt(plan.amountIn), 6)} USDC\nTo: ${transferTo}\nEstimated network fee: ${formatEther(BigInt(plan.estimatedFee!))} USDC\nMaximum network fee: ${formatEther(fee)} USDC\nExpires: ${new Date(plan.deadline * 1000).toISOString().slice(11, 19)} UTC\n\nConfirm sends real USDC to this address.`
             : mainnetTradeReviewText(plan),
         },
         action: {
@@ -188,36 +178,10 @@ export async function mainnetTradeReviewReply(
     };
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
-    if (code === "insufficient_eth_for_network_fee" && !afterTopup) {
-      const topup = await welcomeGasTopup(db, account, getAddress(wallet.address)).catch(
-        (e: unknown) => {
-          console.warn("Gas top-up check failed", e instanceof Error ? e.name : "unknown");
-          return "skipped" as const;
-        },
-      );
-      if (topup === "pending")
-        return text(
-          `${topupNote()}\n\nIt’s still arriving on Robinhood Chain. Please send your request again in a minute. Nothing else was sent.`,
-        );
-      if (topup === "sent") {
-        const reply = await mainnetTradeReviewReply(
-          db,
-          key,
-          account,
-          phone,
-          messageId,
-          symbol,
-          side,
-          amount,
-          transferTo,
-          true,
-        );
-        return withNote(reply, topupNote());
-      }
-    }
     const reasons: Record<string, string> = {
       insufficient_tokens: "Your wallet doesn’t have enough of the input token.",
-      insufficient_eth_for_network_fee: "Your wallet needs more ETH for the reviewed network fee.",
+      insufficient_eth_for_network_fee:
+        "Keep a little extra USDC: it also pays the network fee on Arc.",
       route_unavailable: "The quote service is temporarily unavailable.",
       lifi_quote_unavailable: "Both trading quote services are temporarily unavailable.",
       lifi_fee_limit_exceeded: "The backup provider’s fee exceeds the allowed limit.",
@@ -320,7 +284,7 @@ export function mainnetTradeStatusReply(db: DatabaseSync, account: string) {
             expired: "Review expired",
             cancelled: "Cancelled",
           };
-          return `${new Date(o.created).toISOString().slice(11, 19)} UTC: ${label[o.state] ?? "Checking"}${steps.length ? "\n" + steps.map((s) => `https://robinhoodchain.blockscout.com/tx/${s.tx_hash}`).join("\n") : ""}`;
+          return `${new Date(o.created).toISOString().slice(11, 19)} UTC: ${label[o.state] ?? "Checking"}${steps.length ? "\n" + steps.map((s) => `https://explorer.arc.io/tx/${s.tx_hash}`).join("\n") : ""}`;
         })
         .join("\n\n"),
   );

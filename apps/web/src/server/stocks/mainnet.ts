@@ -11,10 +11,13 @@ import {
 import { z } from "zod";
 import {
   MAINNET_ASSETS,
-  MAINNET_USDG,
-  robinhoodMainnet,
+  KYBER_CHAIN_SLUG,
+  MAINNET_CHAIN_ID,
+  MAINNET_QUOTE,
+  STOCK_ISSUER_OWNER,
+  mainnetChain,
   type MainnetStock,
-} from "../networks/robinhood";
+} from "../networks/chain";
 
 export class MainnetReadError extends Error {
   constructor(
@@ -34,24 +37,14 @@ export class MainnetReadError extends Error {
   }
 }
 const client = createPublicClient({
-  chain: robinhoodMainnet,
-  transport: http(robinhoodMainnet.rpcUrls.default.http[0], {
+  chain: mainnetChain,
+  transport: http(mainnetChain.rpcUrls.default.http[0], {
     timeout: 10000,
     retryCount: 1,
     retryDelay: 300,
   }),
 });
-const multiplierAbi = parseAbi(["function uiMultiplier() view returns (uint256)"]);
-const registrySchema = z.object({
-  assets: z.array(
-    z.object({
-      tokenSymbol: z.string(),
-      status: z.string(),
-      tokenDecimals: z.number(),
-      deployments: z.array(z.object({ chainId: z.number(), contractAddress: z.string() })),
-    }),
-  ),
-});
+const ownerAbi = parseAbi(["function owner() view returns (address)"]);
 
 let registryPending: Promise<typeof MAINNET_ASSETS> | undefined;
 export function verifiedMainnetRegistry() {
@@ -61,34 +54,36 @@ export function verifiedMainnetRegistry() {
     });
   return registryPending;
 }
+// Arc has no official stock-token registry, so each pinned token is verified on-chain:
+// contract code, symbol, decimals and the issuer's owner address. Copycat tokens with the
+// same name and symbol exist on Arc; only these exact addresses are ever traded.
 async function readMainnetRegistry() {
-  let body: unknown;
   try {
-    const response = await fetch("https://api.robinhood.com/rhj/assets", {
-      signal: AbortSignal.timeout(10000),
-      redirect: "error",
-      cache: "no-store",
-    });
-    if (!response.ok) throw Error("registry_http");
-    body = await response.json();
-  } catch {
-    throw new MainnetReadError("registry_unavailable");
-  }
-  const parsed = registrySchema.safeParse(body);
-  if (!parsed.success) throw new MainnetReadError("registry_unavailable");
-  for (const [symbol, expected] of Object.entries(MAINNET_ASSETS)) {
-    const rows = parsed.data.assets.filter((asset) => asset.tokenSymbol === symbol);
-    const deployments = rows.flatMap((asset) =>
-      asset.deployments.filter((d) => d.chainId === 4663),
+    await Promise.all(
+      Object.entries(MAINNET_ASSETS).map(async ([symbol, expected]) => {
+        const [code, decimals, onchainSymbol, owner] = await Promise.all([
+          client.getCode({ address: expected.address }),
+          client.readContract({
+            address: expected.address,
+            abi: erc20Abi,
+            functionName: "decimals",
+          }),
+          client.readContract({ address: expected.address, abi: erc20Abi, functionName: "symbol" }),
+          client.readContract({ address: expected.address, abi: ownerAbi, functionName: "owner" }),
+        ]);
+        if (
+          !code ||
+          code === "0x" ||
+          decimals !== expected.decimals ||
+          onchainSymbol !== symbol ||
+          owner.toLowerCase() !== STOCK_ISSUER_OWNER
+        )
+          throw new MainnetReadError("registry_changed");
+      }),
     );
-    if (
-      rows.length !== 1 ||
-      rows[0].status !== "ASSET_STATUS_ACTIVE" ||
-      rows[0].tokenDecimals !== expected.decimals ||
-      deployments.length !== 1 ||
-      deployments[0].contractAddress.toLowerCase() !== expected.address.toLowerCase()
-    )
-      throw new MainnetReadError("registry_changed");
+  } catch (error) {
+    if (error instanceof MainnetReadError) throw error;
+    throw new MainnetReadError("registry_unavailable");
   }
   return MAINNET_ASSETS;
 }
@@ -104,7 +99,7 @@ async function readMainnetSnapshot() {
   try {
     const [chainId, block] = await Promise.all([client.getChainId(), client.getBlock()]);
     const age = Date.now() - Number(block.timestamp) * 1000;
-    if (chainId !== 4663 || age > 120000 || age < -30000) throw Error("stale_mainnet");
+    if (chainId !== MAINNET_CHAIN_ID || age > 120000 || age < -30000) throw Error("stale_mainnet");
     return block;
   } catch {
     throw new MainnetReadError("rpc_unavailable");
@@ -116,11 +111,11 @@ export async function mainnetPortfolio(wallet: Address) {
   const block = await mainnetSnapshot();
   const tokens = [
     ...Object.entries(MAINNET_ASSETS).map(([symbol, asset]) => ({ symbol, ...asset })),
-    MAINNET_USDG,
+    MAINNET_QUOTE,
   ];
   const balances = await Promise.all(
     tokens.map(async (token) => {
-      const [code, decimals, symbol, balance, multiplier] = await Promise.all([
+      const [code, decimals, symbol, balance] = await Promise.all([
         client.getCode({ address: token.address, blockNumber: block.number }),
         client.readContract({
           address: token.address,
@@ -141,35 +136,22 @@ export async function mainnetPortfolio(wallet: Address) {
           args: [wallet],
           blockNumber: block.number,
         }),
-        token.symbol === "USDG"
-          ? Promise.resolve(10n ** 18n)
-          : client.readContract({
-              address: token.address,
-              abi: multiplierAbi,
-              functionName: "uiMultiplier",
-              blockNumber: block.number,
-            }),
       ]);
-      if (
-        !code ||
-        code === "0x" ||
-        decimals !== token.decimals ||
-        symbol !== token.symbol ||
-        multiplier <= 0n
-      )
+      if (!code || code === "0x" || decimals !== token.decimals || symbol !== token.symbol)
         throw new MainnetReadError("registry_changed");
       return {
         symbol,
         address: token.address,
         decimals,
         balance,
-        multiplier,
+        // Arc stock tokens carry no corporate-action multiplier: 1 token is 1 share.
+        multiplier: 10n ** 18n,
         formatted: formatUnits(balance, decimals),
       };
     }),
   );
   const eth = await client.getBalance({ address: wallet, blockNumber: block.number });
-  return { chainId: 4663 as const, wallet, block, balances, eth };
+  return { chainId: MAINNET_CHAIN_ID, wallet, block, balances, eth };
 }
 const integer = z.string().regex(/^\d{1,78}$/);
 const priceSchema = z.object({
@@ -205,8 +187,8 @@ export async function mainnetPrice(symbol: MainnetStock, side: "buy" | "sell", a
 }
 async function readMainnetPrice(symbol: MainnetStock, side: "buy" | "sell", amount: string) {
   const stock = MAINNET_ASSETS[symbol];
-  const sell = side === "buy" ? MAINNET_USDG : stock;
-  const buy = side === "buy" ? stock : MAINNET_USDG;
+  const sell = side === "buy" ? MAINNET_QUOTE : stock;
+  const buy = side === "buy" ? stock : MAINNET_QUOTE;
   if (!new RegExp(`^(?:0|[1-9]\\d{0,3})(?:\\.\\d{1,${sell.decimals}})?$`).test(amount))
     throw new MainnetReadError("invalid_amount");
   const sellAmount = parseUnits(amount, sell.decimals);
@@ -214,7 +196,7 @@ async function readMainnetPrice(symbol: MainnetStock, side: "buy" | "sell", amou
     throw new MainnetReadError("invalid_amount");
   await verifiedMainnetRegistry();
   const block = await mainnetSnapshot();
-  const url = new URL("https://aggregator-api.kyberswap.com/robinhood/api/v1/routes");
+  const url = new URL(`https://aggregator-api.kyberswap.com/${KYBER_CHAIN_SLUG}/api/v1/routes`);
   url.search = new URLSearchParams({
     tokenIn: sell.address,
     tokenOut: buy.address,
@@ -251,7 +233,7 @@ async function readMainnetPrice(symbol: MainnetStock, side: "buy" | "sell", amou
     throw new MainnetReadError("invalid_response");
   if (BigInt(price.amountOut) <= 0n) throw new MainnetReadError("no_liquidity");
   return {
-    chainId: 4663 as const,
+    chainId: MAINNET_CHAIN_ID,
     symbol,
     side,
     sellAmount,
