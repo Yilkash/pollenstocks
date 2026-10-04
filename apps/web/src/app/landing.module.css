@@ -663,47 +663,46 @@
   transform: translateY(-1px);
 }
 
-/* Pollenstocks: drawn chat until real screenshots exist */
-.phoneMock {
-  justify-self: center;
-  width: min(340px, 100%);
-  border: 8px solid var(--frame);
-  border-radius: 34px;
-  background: #0f1a15;
+/* Hero: two real WhatsApp screenshots, overlapped like phones */
+.phones {
+  position: relative;
+  height: 600px;
+}
+.phones img {
+  position: absolute;
+  width: 270px;
+  border-radius: 28px;
+  border: 6px solid var(--frame);
   box-shadow: 0 30px 60px rgba(12, 31, 24, 0.25);
-  overflow: hidden;
+}
+.phoneBack {
+  top: 0;
+  left: 6%;
+  transform: rotate(-5deg);
+}
+.phoneFront {
+  top: 60px;
+  right: 4%;
+  transform: rotate(4deg);
 }
 
-.phoneHeader {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  background: #15261e;
-  color: white;
-  font-weight: 700;
+@media (max-width: 960px) {
+  .phones {
+    height: 520px;
+    max-width: 480px;
+    width: 100%;
+    margin: 0 auto;
+  }
 }
 
-.chat {
-  display: grid;
-  gap: 8px;
-  padding: 16px;
-  font-size: 14px;
-}
-
-.chat p {
-  margin: 0;
-  padding: 9px 12px;
-  border-radius: 12px;
-  color: #e6efe9;
-}
-
-.me {
-  justify-self: end;
-  background: #1f5c3c;
-}
-
-.bot {
-  justify-self: start;
-  background: #1b2b23;
+@media (max-width: 560px) {
+  .phones {
+    height: 440px;
+  }
+  .phones img {
+    width: 200px;
+  }
+  .phoneFront {
+    top: 40px;
+  }
 }

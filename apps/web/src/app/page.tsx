@@ -164,32 +164,17 @@ export default function Landing() {
               </a>
             </div>
           </div>
-          <div className={styles.phoneMock} aria-label="Example Pollenstocks conversation">
-            <div className={styles.phoneHeader}>
-              <img className={styles.brandLogo} src="/images/pollenstocks-logo.png" alt="" />
-              Pollenstocks
-            </div>
-            <div className={styles.chat}>
-              <p className={styles.me}>Buy NVIDIA with 5 USDC</p>
-              <p className={styles.bot}>
-                <b>Buy NVIDIA (NVDA)</b>
-                <br />
-                Arc
-                <br />
-                <br />
-                Pay: 5 USDC
-                <br />
-                Receive: ≈ 0.02121 NVDA
-                <br />
-                Network fee: up to 0.01 USDC
-                <br />
-                ✅ Backed 1:1: vault verified
-                <br />
-                <b>[ Confirm buy ]</b>
-              </p>
-              <p className={styles.me}>Confirm buy</p>
-              <p className={styles.bot}>Trade complete ✅ Arc explorer receipt ↗</p>
-            </div>
+          <div className={styles.phones}>
+            <img
+              src="/images/whatsapp-sell-receipt.jpg"
+              alt="Pollenstocks in WhatsApp confirming an NVIDIA sale with an Arc explorer receipt"
+              className={styles.phoneBack}
+            />
+            <img
+              src="/images/whatsapp-buy-review.jpg"
+              alt="Pollenstocks in WhatsApp reviewing a 1 USDC NVIDIA buy, backed 1:1 with the vault verified"
+              className={styles.phoneFront}
+            />
           </div>
         </section>
 
