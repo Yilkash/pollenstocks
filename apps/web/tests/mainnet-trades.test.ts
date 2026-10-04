@@ -1,164 +1,241 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  encodeFunctionData,
   encodeAbiParameters,
-  decodeFunctionData,
-  zeroAddress,
+  encodeEventTopics,
+  encodeFunctionData,
   erc20Abi,
   keccak256,
+  parseAbiParameters,
   toBytes,
   type Address,
+  type Log,
 } from "viem";
 import { DatabaseSync } from "node:sqlite";
 import {
-  mainnetRouterAbi,
-  simpleSwapParameters,
-  KYBER_ROUTER,
+  deskTradeData,
   validateMainnetPlan,
   type MainnetPlan,
 } from "../src/server/stocks/mainnet-trade";
-import { MAINNET_ASSETS, MAINNET_QUOTE } from "../src/server/networks/chain";
+import { mainnetTradeOutput } from "../src/server/stocks/mainnet-trade-receipt";
+import { deskAbi } from "../src/server/stocks/arcstocks-desk";
+import { fullyBacked } from "../src/server/stocks/backing";
+import {
+  mainnetPolicyRules,
+  validateMainnetPolicyRules,
+} from "../src/server/stocks/mainnet-policy";
+import {
+  ARCSTOCKS_DESK,
+  MAINNET_ASSETS,
+  MAINNET_QUOTE,
+  NATIVE_TRANSFER_LOGGER,
+} from "../src/server/networks/chain";
 import {
   mainnetConfirmationReply,
   migrateMainnetOrders,
   orderDigest,
 } from "../src/server/stocks/mainnet-orders";
-const executor = "0x1111111111111111111111111111111111111111" as Address;
+const stranger = "0x1111111111111111111111111111111111111111" as Address;
 const wallet = "0x2222222222222222222222222222222222222222" as Address;
-process.env.MAINNET_KYBER_EXECUTOR = executor;
-process.env.MAINNET_KYBER_EXECUTOR_CODEHASH = "0x" + "11".repeat(32);
-process.env.MAINNET_ROUTER_CODEHASH = "0x" + "22".repeat(32);
+const NVDA = MAINNET_ASSETS.NVDA.address;
 process.env.PRIVY_MAINNET_POLICY_ID = "test-policy";
 process.env.MAINNET_MAX_USDC_PER_TRADE = "10";
 process.env.MAINNET_MAX_FEE_WEI = "1000000000000000";
-function plan(): MainnetPlan {
-  const id = "11111111-1111-4111-8111-111111111111",
-    deadline = Math.floor(Date.now() / 1000) + 200;
-  const orderId = keccak256(toBytes(`pollenstocks-arc-v1:${wallet.toLowerCase()}:${id}`));
-  return {
-    id,
-    orderId,
-    wallet,
-    router: KYBER_ROUTER,
-    symbol: "NVDA",
-    side: "buy",
-    inputToken: MAINNET_QUOTE.address,
-    outputToken: MAINNET_ASSETS.NVDA.address,
+const id = "11111111-1111-4111-8111-111111111111";
+const base = () => ({
+  provider: "arcstocks-desk" as const,
+  id,
+  orderId: keccak256(toBytes(`pollenstocks-arc-v1:${wallet.toLowerCase()}:${id}`)),
+  wallet,
+  router: ARCSTOCKS_DESK as Address,
+  symbol: "NVDA" as const,
+  deadline: Math.floor(Date.now() / 1000) + 200,
+});
+// Buy NVDA with 1 USDC: one payable desk call carrying 1 USDC (18-decimal native value).
+function buyPlan(): MainnetPlan {
+  const p = {
+    ...base(),
+    side: "buy" as const,
+    inputToken: MAINNET_QUOTE.address as Address,
+    outputToken: NVDA as Address,
     amountIn: "1000000",
-    expectedOutput: "10000000000000000",
-    minimumOutput: "9900000000000000",
-    deadline,
+    expectedOutput: "4242983906768669",
+    minimumOutput: ((4242983906768669n * 99n) / 100n).toString(),
+  };
+  return {
+    ...p,
+    steps: [
+      {
+        kind: "trade",
+        to: ARCSTOCKS_DESK,
+        data: deskTradeData(p),
+        value: "1000000000000000000",
+        gas: "120000",
+        gasPrice: "1000000",
+      },
+    ],
+  };
+}
+// Sell 0.01 NVDA: an exact approval to the desk, then the desk sell.
+function sellPlan(): MainnetPlan {
+  const p = {
+    ...base(),
+    side: "sell" as const,
+    inputToken: NVDA as Address,
+    outputToken: MAINNET_QUOTE.address as Address,
+    amountIn: "10000000000000000",
+    expectedOutput: "2337296",
+    minimumOutput: ((2337296n * 99n) / 100n).toString(),
+  };
+  return {
+    ...p,
     steps: [
       {
         kind: "approve",
-        to: MAINNET_QUOTE.address,
+        to: NVDA,
         data: encodeFunctionData({
           abi: erc20Abi,
           functionName: "approve",
-          args: [KYBER_ROUTER, 1000000n],
+          args: [ARCSTOCKS_DESK, 10000000000000000n],
         }),
         gas: "100000",
         gasPrice: "1000000",
       },
       {
         kind: "trade",
-        to: KYBER_ROUTER,
-        data: encodeFunctionData({
-          abi: mainnetRouterAbi,
-          functionName: "swap",
-          args: [
-            {
-              callTarget: executor,
-              approveTarget: zeroAddress,
-              targetData: encodeAbiParameters(simpleSwapParameters, [
-                {
-                  firstPools: [executor],
-                  firstSwapAmounts: [1000000n],
-                  swapDatas: ["0x1234"],
-                  deadline: BigInt(deadline),
-                  positiveSlippageData: "0x",
-                },
-              ]),
-              desc: {
-                srcToken: MAINNET_QUOTE.address,
-                dstToken: MAINNET_ASSETS.NVDA.address,
-                srcReceivers: [],
-                srcAmounts: [],
-                feeReceivers: [],
-                feeAmounts: [],
-                dstReceiver: wallet,
-                amount: 1000000n,
-                minReturnAmount: 9900000000000000n,
-                flags: 32n,
-                permit: "0x",
-              },
-              clientData: "0x",
-            },
-          ],
-        }),
-        gas: "2000000",
+        to: ARCSTOCKS_DESK,
+        data: deskTradeData(p),
+        gas: "150000",
         gasPrice: "1000000",
       },
     ],
   };
 }
-test("valid unsigned mainnet plan passes structural checks", () =>
-  assert.doesNotThrow(() => validateMainnetPlan(plan())));
-test("rejects recipient, pair, amount, minimum, order and fee mutations", () => {
-  const mutate: ((p: MainnetPlan) => void)[] = [
-    (p) => {
-      p.wallet = executor;
-    },
-    (p) => {
-      p.outputToken = MAINNET_QUOTE.address;
-    },
-    (p) => {
-      p.amountIn = "11000000";
-    },
-    (p) => {
-      p.minimumOutput = "1";
-    },
-    (p) => {
-      p.deadline++;
-    },
-    (p) => {
-      p.steps[1].to = wallet;
-    },
-    (p) => {
-      p.steps[0].gasPrice = "99999999999999999";
-    },
-    (p) => {
-      p.steps[0].data = encodeFunctionData({
-        abi: erc20Abi,
-        functionName: "approve",
-        args: [wallet, 1000000n],
-      });
-    },
-    (p) => {
-      p.steps[0].data = encodeFunctionData({
-        abi: erc20Abi,
-        functionName: "approve",
-        args: [KYBER_ROUTER, 2n ** 256n - 1n],
-      });
-    },
+test("valid desk buy and sell plans pass structural checks", () => {
+  assert.doesNotThrow(() => validateMainnetPlan(buyPlan()));
+  assert.doesNotThrow(() => validateMainnetPlan(sellPlan()));
+});
+test("rejects recipient, pair, amount, minimum, value, venue and fee mutations", () => {
+  const mutate: [() => MainnetPlan, (p: MainnetPlan) => void][] = [
+    [buyPlan, (p) => void (p.wallet = stranger)],
+    [buyPlan, (p) => void (p.outputToken = MAINNET_QUOTE.address)],
+    [buyPlan, (p) => void (p.amountIn = "11000000")],
+    [buyPlan, (p) => void (p.minimumOutput = "1")],
+    [buyPlan, (p) => void (p.steps[0].value = "2000000000000000000")],
+    [buyPlan, (p) => void delete p.steps[0].value],
+    [buyPlan, (p) => void (p.steps[0].to = stranger)],
+    [buyPlan, (p) => void (p.router = stranger)],
+    [buyPlan, (p) => void (p.steps[0].gasPrice = "99999999999999999")],
+    [
+      buyPlan,
+      (p) =>
+        void (p.steps[0].data = encodeFunctionData({
+          abi: deskAbi,
+          functionName: "buy",
+          args: [NVDA, BigInt(p.minimumOutput), stranger],
+        })),
+    ],
+    [sellPlan, (p) => void (p.steps[0].value = "1")],
+    [
+      sellPlan,
+      (p) =>
+        void (p.steps[0].data = encodeFunctionData({
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [stranger, 10000000000000000n],
+        })),
+    ],
+    [
+      sellPlan,
+      (p) =>
+        void (p.steps[0].data = encodeFunctionData({
+          abi: erc20Abi,
+          functionName: "approve",
+          args: [ARCSTOCKS_DESK, 2n ** 256n - 1n],
+        })),
+    ],
+    [sellPlan, (p) => void (p.steps = [p.steps[1]])],
+    [
+      sellPlan,
+      (p) =>
+        void (p.steps[1].data = encodeFunctionData({
+          abi: deskAbi,
+          functionName: "sell",
+          args: [NVDA, BigInt(p.amountIn), 0n, wallet],
+        })),
+    ],
   ];
-  for (const change of mutate) {
-    const p = plan();
+  for (const [make, change] of mutate) {
+    const p = make();
     change(p);
     assert.throws(() => validateMainnetPlan(p));
   }
 });
-test("unknown executor flags are refused even if the outer amounts are correct", () => {
-  const p = plan();
-  const call = decodeFunctionData({ abi: mainnetRouterAbi, data: p.steps[1].data });
-  const e = call.args[0];
-  p.steps[1].data = encodeFunctionData({
-    abi: mainnetRouterAbi,
-    functionName: "swap",
-    args: [{ ...e, desc: { ...e.desc, flags: 1024n } }],
-  });
-  assert.throws(() => validateMainnetPlan(p), /unsupported_kyber_route_encoding/);
+
+const transferLog = (token: Address, from: Address, to: Address, value: bigint) =>
+  ({
+    address: token,
+    topics: encodeEventTopics({ abi: erc20Abi, eventName: "Transfer", args: { from, to } }),
+    data: encodeAbiParameters(parseAbiParameters("uint256"), [value]),
+  }) as unknown as Log;
+const deskLog = (name: "Bought" | "Sold", who: Address, a: bigint, b: bigint) =>
+  ({
+    address: ARCSTOCKS_DESK,
+    topics: encodeEventTopics({
+      abi: deskAbi,
+      eventName: name,
+      args: name === "Bought" ? { stock: NVDA, buyer: who } : { stock: NVDA, seller: who },
+    }),
+    data: encodeAbiParameters(parseAbiParameters("address,uint256,uint256,uint256"), [
+      who,
+      a,
+      b,
+      234n * 10n ** 18n,
+    ]),
+  }) as unknown as Log;
+test("a desk buy receipt yields the shares received", () => {
+  const p = buyPlan();
+  const usdc = 10n ** 18n,
+    shares = BigInt(p.expectedOutput);
+  const logs = [
+    transferLog(NATIVE_TRANSFER_LOGGER, wallet, ARCSTOCKS_DESK, usdc),
+    transferLog(NVDA, ARCSTOCKS_DESK, wallet, shares),
+    deskLog("Bought", wallet, usdc, shares),
+  ];
+  assert.equal(mainnetTradeOutput(p, logs), shares);
+  // Shares sent elsewhere, or a short fill, are refused.
+  assert.throws(() =>
+    mainnetTradeOutput(p, [logs[0], transferLog(NVDA, ARCSTOCKS_DESK, stranger, shares), logs[2]]),
+  );
+  assert.throws(() =>
+    mainnetTradeOutput(p, [logs[0], logs[1], deskLog("Bought", wallet, usdc, 1n)]),
+  );
+});
+test("a desk sell receipt yields USDC received in 6 decimals", () => {
+  const p = sellPlan();
+  const shares = BigInt(p.amountIn),
+    usdc = 2337296242750000000n;
+  const logs = [
+    transferLog(NVDA, wallet, ARCSTOCKS_DESK, shares),
+    transferLog(NATIVE_TRANSFER_LOGGER, ARCSTOCKS_DESK, wallet, usdc),
+    deskLog("Sold", wallet, shares, usdc),
+  ];
+  assert.equal(mainnetTradeOutput(p, logs), 2337296n);
+  assert.throws(() => mainnetTradeOutput(p, [logs[0], logs[2]]));
+});
+test("the generated wallet policy validates, and a looser buy value is refused", () => {
+  const rules = JSON.parse(JSON.stringify(mainnetPolicyRules()));
+  assert.doesNotThrow(() => validateMainnetPolicyRules(rules, NVDA));
+  const buy = rules.find((r: { name: string }) => r.name === "ArcStocks desk buy");
+  buy.conditions.find((c: { field: string }) => c.field === "value").value =
+    "0xffffffffffffffffffff";
+  assert.throws(() => validateMainnetPolicyRules(rules));
+});
+test("backing holds only when the vault covers the Arc supply", () => {
+  assert.equal(fullyBacked(100n, 100n), true);
+  assert.equal(fullyBacked(1000n, 999n), true); // 0.1% in transit
+  assert.equal(fullyBacked(1000n, 998n), false);
+  assert.equal(fullyBacked(0n, 0n), true);
 });
 function dbFor(state = "review", expires = Date.now() + 60000) {
   const db = new DatabaseSync(":memory:");

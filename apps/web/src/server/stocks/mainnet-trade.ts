@@ -1,16 +1,11 @@
-import { prepareMainnetQuote } from "./mainnet-quote";
 import { randomUUID } from "node:crypto";
 import {
   createPublicClient,
   http,
-  parseAbi,
   erc20Abi,
   encodeFunctionData,
   decodeFunctionData,
   getAddress,
-  decodeAbiParameters,
-  encodeAbiParameters,
-  parseAbiParameters,
   zeroAddress,
   isAddress,
   keccak256,
@@ -18,8 +13,10 @@ import {
   parseUnits,
   type Address,
   type Hex,
+  type PublicClient,
 } from "viem";
 import {
+  ARCSTOCKS_DESK,
   MAINNET_ASSETS,
   MAINNET_CHAIN_ID,
   MAINNET_QUOTE,
@@ -29,6 +26,8 @@ import {
 } from "../networks/chain";
 import { fairPriceCheck } from "./reference-price";
 import { verifiedMainnetRegistry } from "./mainnet";
+import { checkDesk, deskAbi, deskQuote } from "./arcstocks-desk";
+import { verifyBacking } from "./backing";
 
 export const mainnetRpc = createPublicClient({
   chain: mainnetChain,
@@ -41,18 +40,9 @@ export const mainnetRpc = createPublicClient({
     batch: { batchSize: 50, wait: 10 },
   }),
 });
-export const KYBER_ROUTER = "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5" as const;
-// ABI published with KyberSwap MetaAggregationRouterV2. Only the explicitly
-// validated outer swap terms are required for simple and provider-trusted packed routes.
-export const mainnetRouterAbi = parseAbi([
-  "struct SwapDescription { address srcToken; address dstToken; address[] srcReceivers; uint256[] srcAmounts; address[] feeReceivers; uint256[] feeAmounts; address dstReceiver; uint256 amount; uint256 minReturnAmount; uint256 flags; bytes permit; }",
-  "struct SwapExecution { address callTarget; address approveTarget; bytes targetData; SwapDescription desc; bytes clientData; }",
-  "function swap(SwapExecution execution) payable returns (uint256 returnAmount, uint256 gasUsed)",
-  "event Swapped(address sender,address srcToken,address dstToken,address dstReceiver,uint256 spentAmount,uint256 returnAmount)",
-]);
-export const simpleSwapParameters = parseAbiParameters(
-  "(address[] firstPools,uint256[] firstSwapAmounts,bytes[] swapDatas,uint256 deadline,bytes positiveSlippageData) data",
-);
+const arc = mainnetRpc as PublicClient;
+/** Desk trades fit well within this; observed ~92k gas for a buy and ~87k for a sell. */
+const DESK_TRADE_GAS = 150000n;
 export function requireTrade(ok: unknown, code = "mainnet_validation_failed"): asserts ok {
   if (!ok) throw Error(code);
 }
@@ -82,56 +72,43 @@ export function broadcastGasPrice(suggested: bigint, baseFee: bigint, ceiling: b
 }
 export const sameAddress = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 export function mainnetTradeConfig() {
-  const executor = process.env.MAINNET_KYBER_EXECUTOR?.trim();
-  const executorHash = process.env.MAINNET_KYBER_EXECUTOR_CODEHASH?.trim();
-  const routerHash = process.env.MAINNET_ROUTER_CODEHASH?.trim();
   const policy = process.env.PRIVY_MAINNET_POLICY_ID?.trim();
   const maxInput = process.env.MAINNET_MAX_USDC_PER_TRADE?.trim();
   const maxFees = process.env.MAINNET_MAX_FEE_WEI?.trim();
-  requireTrade(
-    executor &&
-      isAddress(executor) &&
-      executorHash &&
-      /^0x[a-fA-F0-9]{64}$/.test(executorHash) &&
-      routerHash &&
-      /^0x[a-fA-F0-9]{64}$/.test(routerHash) &&
-      policy,
-    "mainnet_setup_required",
-  );
+  requireTrade(policy, "mainnet_setup_required");
   requireTrade(maxInput && /^\d+(\.\d{1,6})?$/.test(maxInput), "mainnet_limits_required");
   requireTrade(!maxFees || /^[1-9]\d{0,18}$/.test(maxFees), "mainnet_fee_limit_invalid");
   const inputCap = parseUnits(maxInput, 6),
     feeCap = maxFees ? BigInt(maxFees) : undefined;
   requireTrade(
+    // The ArcStocks desk fills up to 500 USDC per trade.
     inputCap > 0n &&
-      inputCap <= 1000_000000n &&
+      inputCap <= 500_000000n &&
       // Arc gas is USDC in 18-decimal native units: 0.1 USDC per trade at most.
       (feeCap === undefined || feeCap <= 100000000000000000n),
     "mainnet_limits_invalid",
   );
-  return { executor: getAddress(executor), executorHash, routerHash, policy, inputCap, feeCap };
+  return { policy, inputCap, feeCap };
 }
-export async function checkMainnetRouter() {
+/** Fresh Arc chain head, and the ArcStocks desk exactly as pinned and not paused. */
+export async function checkMainnetVenue() {
   const c = mainnetTradeConfig();
   requireTrade((await mainnetRpc.getChainId()) === MAINNET_CHAIN_ID);
   const block = await mainnetRpc.getBlock();
   requireTrade(Math.abs(Date.now() - Number(block.timestamp) * 1000) < 120000);
-  const [executorCode, routerCode] = await Promise.all([
-    mainnetRpc.getCode({ address: c.executor }),
-    mainnetRpc.getCode({ address: KYBER_ROUTER }),
-  ]);
-  requireTrade(executorCode && executorCode !== "0x" && routerCode && routerCode !== "0x");
-  requireTrade(
-    keccak256(executorCode) === c.executorHash && keccak256(routerCode) === c.routerHash,
-    "mainnet_router_code_changed",
-  );
+  try {
+    await checkDesk(arc);
+  } catch (error) {
+    throw Error(error instanceof Error ? error.message : "desk_unavailable");
+  }
   return c;
 }
 export type MainnetPlan = {
-  provider?: "kyber";
+  provider?: "arcstocks-desk";
   id: string;
   orderId: Hex;
   wallet: Address;
+  /** The ArcStocks desk for trades (and a fixed placeholder for USDC payments). */
   router: Address;
   symbol: MainnetStock | typeof MAINNET_QUOTE.symbol;
   transferTo?: Address;
@@ -147,11 +124,35 @@ export type MainnetPlan = {
     kind: "reset" | "approve" | "trade" | "transfer";
     to: Address;
     data: Hex;
+    /** Native USDC sent with the step, 18 decimals; only a desk buy sends any. */
+    value?: string;
     gas: string;
     gasPrice: string;
   }[];
 };
-// Decode provider calldata before approval. No application contract is deployed.
+/** Exact desk calldata for a reviewed trade. Minimums are in each side's output units. */
+export function deskTradeData(
+  p: Pick<MainnetPlan, "side" | "symbol" | "wallet" | "amountIn" | "minimumOutput">,
+) {
+  const stock = MAINNET_ASSETS[p.symbol as MainnetStock].address;
+  return p.side === "buy"
+    ? encodeFunctionData({
+        abi: deskAbi,
+        functionName: "buy",
+        args: [stock, BigInt(p.minimumOutput), p.wallet],
+      })
+    : encodeFunctionData({
+        abi: deskAbi,
+        functionName: "sell",
+        args: [
+          stock,
+          BigInt(p.amountIn),
+          BigInt(p.minimumOutput) * NATIVE_PER_QUOTE_UNIT,
+          p.wallet,
+        ],
+      });
+}
+// Trades go through the pinned ArcStocks desk; every step's calldata is built here.
 export async function prepareMainnetPlan(
   wallet: Address,
   symbol: MainnetStock,
@@ -159,7 +160,7 @@ export async function prepareMainnetPlan(
   amount: string,
 ): Promise<MainnetPlan> {
   requireTrade(isAddress(wallet) && symbol in MAINNET_ASSETS && ["buy", "sell"].includes(side));
-  const c = await checkMainnetRouter();
+  const c = await checkMainnetVenue();
   await verifiedMainnetRegistry();
   const stock = MAINNET_ASSETS[symbol];
   const input = side === "buy" ? MAINNET_QUOTE : stock,
@@ -171,32 +172,36 @@ export async function prepareMainnetPlan(
   const amountIn = parseUnits(amount, input.decimals);
   requireTrade(amountIn > 0n && amountIn <= parseUnits("1000", input.decimals), "invalid_amount");
   if (side === "buy") requireTrade(amountIn <= c.inputCap, "trade_limit_exceeded");
-  const quote = await prepareMainnetQuote({
-    wallet,
-    inputToken: input.address,
-    outputToken: output.address,
-    amountIn: amountIn.toString(),
+  // Never trade a token whose Arc supply is not fully held in the vault on Robinhood Chain.
+  await verifyBacking(arc, symbol).catch((error: unknown) => {
+    throw Error(error instanceof Error ? error.message : "backing_unavailable");
   });
-  const expected = BigInt(quote.expectedOutput),
-    minimum = BigInt(quote.minimumOutput),
-    deadline = quote.deadline;
+  const quote = await deskQuote(arc, symbol, side, amountIn).catch((error: unknown) => {
+    throw Error(error instanceof Error ? error.message : "desk_unavailable");
+  });
+  const expected = quote.amountOut,
+    minimum = (expected * 99n) / 100n;
   requireTrade(minimum > 0n && (side !== "sell" || expected <= c.inputCap));
-  // Refuse a route far from the real market (thin pools, copycat liquidity).
+  // Refuse a desk price far from the real market.
   await fairPriceCheck(symbol, side, amountIn, expected);
   const [balance, eth, allowance, suggestedPrice, decimals, block] = await Promise.all([
-    mainnetRpc.readContract({
-      address: input.address,
-      abi: erc20Abi,
-      functionName: "balanceOf",
-      args: [wallet],
-    }),
+    side === "buy"
+      ? mainnetRpc.getBalance({ address: wallet }).then((n) => n / NATIVE_PER_QUOTE_UNIT)
+      : mainnetRpc.readContract({
+          address: input.address,
+          abi: erc20Abi,
+          functionName: "balanceOf",
+          args: [wallet],
+        }),
     mainnetRpc.getBalance({ address: wallet }),
-    mainnetRpc.readContract({
-      address: input.address,
-      abi: erc20Abi,
-      functionName: "allowance",
-      args: [wallet, quote.router],
-    }),
+    side === "sell"
+      ? mainnetRpc.readContract({
+          address: input.address,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [wallet, ARCSTOCKS_DESK],
+        })
+      : Promise.resolve(0n),
     mainnetRpc.getGasPrice(),
     mainnetRpc.readContract({ address: input.address, abi: erc20Abi, functionName: "decimals" }),
     mainnetRpc.getBlock(),
@@ -215,14 +220,13 @@ export async function prepareMainnetPlan(
   const price = (gasPrice * 125n + 99n) / 100n;
   let estimatedFee = 0n;
   const gasLimit = (estimate: bigint) => (estimate * 125n + 99n) / 100n;
-  // Estimate approvals from the actual wallet. The swap estimate comes from
-  // the selected provider because its approval has not been submitted yet. The runner simulates
-  // every step immediately before sending, and never raises the reviewed limits.
+  // A sell approves the desk for exactly the shares sold. The runner simulates every step
+  // immediately before sending, and never raises the reviewed limits.
   const approval = async (value: bigint, kind: "reset" | "approve") => {
     const data = encodeFunctionData({
       abi: erc20Abi,
       functionName: "approve",
-      args: [quote.router, value],
+      args: [ARCSTOCKS_DESK, value],
     });
     let estimate = await mainnetRpc.estimateGas({
       account: wallet,
@@ -243,29 +247,48 @@ export async function prepareMainnetPlan(
       gasPrice: price.toString(),
     });
   };
-  if (allowance > 0n) await approval(0n, "reset");
-  await approval(amountIn, "approve");
-  const swapGas = BigInt(quote.swapGas);
-  requireTrade(swapGas > 0n && swapGas <= 2000000n, "swap_gas_unavailable");
-  estimatedFee += swapGas * gasPrice;
+  if (side === "sell") {
+    if (allowance > 0n) await approval(0n, "reset");
+    await approval(amountIn, "approve");
+  }
+  const tradeData = deskTradeData({
+    side,
+    symbol,
+    wallet,
+    amountIn: amountIn.toString(),
+    minimumOutput: minimum.toString(),
+  });
+  const value = side === "buy" ? amountIn * NATIVE_PER_QUOTE_UNIT : 0n;
+  // A buy can be simulated now; a sell cannot until its approval is mined.
+  const tradeGas =
+    side === "buy"
+      ? await mainnetRpc.estimateGas({
+          account: wallet,
+          to: ARCSTOCKS_DESK,
+          data: tradeData,
+          value,
+        })
+      : DESK_TRADE_GAS;
+  requireTrade(tradeGas > 0n && tradeGas <= 400000n, "swap_gas_unavailable");
+  estimatedFee += tradeGas * gasPrice;
   steps.push({
     kind: "trade",
-    to: quote.router,
-    data: quote.data,
-    gas: gasLimit(swapGas).toString(),
+    to: ARCSTOCKS_DESK,
+    data: tradeData,
+    ...(value > 0n ? { value: value.toString() } : {}),
+    gas: gasLimit(tradeGas).toString(),
     gasPrice: price.toString(),
   });
   const fee = steps.reduce((sum, step) => sum + BigInt(step.gas) * BigInt(step.gasPrice), 0n);
   requireTrade(c.feeCap === undefined || fee <= c.feeCap, "operator_fee_limit_exceeded");
   // Arc pays gas in USDC: a buy spends USDC for the trade and the fee from one balance.
-  const spend = side === "buy" ? amountIn * NATIVE_PER_QUOTE_UNIT : 0n;
-  requireTrade(eth >= fee + spend, "insufficient_eth_for_network_fee");
-  const plan = {
+  requireTrade(eth >= fee + value, "insufficient_eth_for_network_fee");
+  const plan: MainnetPlan = {
     id,
     orderId,
     wallet,
-    router: quote.router,
-    provider: quote.provider,
+    router: ARCSTOCKS_DESK,
+    provider: "arcstocks-desk",
     symbol,
     side,
     inputToken: input.address,
@@ -274,7 +297,7 @@ export async function prepareMainnetPlan(
     expectedOutput: expected.toString(),
     minimumOutput: minimum.toString(),
     estimatedFee: estimatedFee.toString(),
-    deadline,
+    deadline: Math.floor(Date.now() / 1000) + 240,
     steps,
   };
   validateMainnetPlan(plan);
@@ -285,7 +308,7 @@ export async function prepareMainnetTransfer(
   recipient: Address,
   amount: string,
 ): Promise<MainnetPlan> {
-  await checkMainnetRouter();
+  await checkMainnetVenue();
   requireTrade(/^(?:0|[1-9]\d{0,3})(?:\.\d{1,6})?$/.test(amount), "invalid_amount");
   const amountIn = parseUnits(amount, 6);
   requireTrade(amountIn > 0n && amountIn <= 1000_000000n, "invalid_amount");
@@ -342,7 +365,7 @@ export async function prepareMainnetTransfer(
     id,
     orderId: keccak256(toBytes(`pollenstocks-arc-v1:${wallet.toLowerCase()}:${id}`)),
     wallet,
-    router: KYBER_ROUTER,
+    router: ARCSTOCKS_DESK,
     symbol: MAINNET_QUOTE.symbol,
     side: "send",
     transferTo: recipient,
@@ -367,7 +390,7 @@ export async function prepareMainnetTransfer(
   return plan;
 }
 export function validateMainnetPlan(p: MainnetPlan) {
-  requireTrade(p.provider === undefined || p.provider === "kyber");
+  requireTrade(p.provider === undefined || p.provider === "arcstocks-desk");
   if (p.side === "send") {
     const c = mainnetTradeConfig(),
       recipient = p.transferTo;
@@ -379,7 +402,7 @@ export function validateMainnetPlan(p: MainnetPlan) {
         zeroAddress,
         p.wallet,
         MAINNET_QUOTE.address,
-        KYBER_ROUTER,
+        ARCSTOCKS_DESK,
         ...Object.values(MAINNET_ASSETS).map((a) => a.address),
       ].some((a) => sameAddress(a, recipient)),
     );
@@ -397,10 +420,12 @@ export function validateMainnetPlan(p: MainnetPlan) {
     requireTrade(
       sameAddress(p.inputToken, MAINNET_QUOTE.address) &&
         sameAddress(p.outputToken, MAINNET_QUOTE.address) &&
-        sameAddress(p.router, KYBER_ROUTER),
+        sameAddress(p.router, ARCSTOCKS_DESK),
     );
     const step = p.steps[0];
-    requireTrade(step.kind === "transfer" && sameAddress(step.to, MAINNET_QUOTE.address));
+    requireTrade(
+      step.kind === "transfer" && sameAddress(step.to, MAINNET_QUOTE.address) && !step.value,
+    );
     requireTrade(
       /^[1-9]\d{0,9}$/.test(step.gas) &&
         BigInt(step.gas) <= 250000n &&
@@ -421,8 +446,8 @@ export function validateMainnetPlan(p: MainnetPlan) {
   }
   const c = mainnetTradeConfig(),
     stock = MAINNET_ASSETS[p.symbol as MainnetStock];
-  const router = KYBER_ROUTER;
   requireTrade(stock && ["buy", "sell"].includes(p.side) && isAddress(p.wallet));
+  requireTrade(p.provider === "arcstocks-desk");
   requireTrade(
     /^[a-f0-9-]{36}$/.test(p.id) &&
       p.orderId === keccak256(toBytes(`pollenstocks-arc-v1:${p.wallet.toLowerCase()}:${p.id}`)),
@@ -430,19 +455,24 @@ export function validateMainnetPlan(p: MainnetPlan) {
   requireTrade(Number.isSafeInteger(p.deadline) && p.deadline > 0);
   requireTrade(BigInt(p.amountIn) <= (p.side === "buy" ? 1000_000000n : 1000n * 10n ** 18n));
   requireTrade(
-    sameAddress(p.router, router) &&
+    sameAddress(p.router, ARCSTOCKS_DESK) &&
       sameAddress(p.inputToken, p.side === "buy" ? MAINNET_QUOTE.address : stock.address) &&
       sameAddress(p.outputToken, p.side === "buy" ? stock.address : MAINNET_QUOTE.address),
   );
   requireTrade(
     BigInt(p.amountIn) > 0n &&
       BigInt(p.minimumOutput) > 0n &&
-      BigInt(p.minimumOutput) >= (BigInt(p.expectedOutput) * 99n) / 100n &&
-      BigInt(p.minimumOutput) <= (BigInt(p.expectedOutput) * 99n) / 100n,
+      BigInt(p.minimumOutput) === (BigInt(p.expectedOutput) * 99n) / 100n,
   );
   requireTrade((p.side === "buy" ? BigInt(p.amountIn) : BigInt(p.expectedOutput)) <= c.inputCap);
-  requireTrade(p.steps.length === 2 || p.steps.length === 3);
-  const kinds = p.steps.length === 3 ? ["reset", "approve", "trade"] : ["approve", "trade"];
+  // A buy is one payable desk call; a sell is an exact approval (after a reset) then the call.
+  const kinds =
+    p.side === "buy"
+      ? ["trade"]
+      : p.steps.length === 3
+        ? ["reset", "approve", "trade"]
+        : ["approve", "trade"];
+  requireTrade(p.steps.length === kinds.length);
   let fees = 0n;
   p.steps.forEach((step, index) => {
     requireTrade(
@@ -452,78 +482,21 @@ export function validateMainnetPlan(p: MainnetPlan) {
     );
     fees += BigInt(step.gas) * BigInt(step.gasPrice);
     if (step.kind !== "trade") {
+      requireTrade(!step.value);
       const call = decodeFunctionData({ abi: erc20Abi, data: step.data });
       requireTrade(sameAddress(step.to, p.inputToken) && call.functionName === "approve");
       requireTrade(
-        sameAddress(call.args[0], router) &&
+        sameAddress(call.args[0], ARCSTOCKS_DESK) &&
           call.args[1] === (step.kind === "reset" ? 0n : BigInt(p.amountIn)),
       );
     } else {
-      requireTrade(sameAddress(step.to, router));
-      validateRouterCall(p, step.data);
+      requireTrade(sameAddress(step.to, ARCSTOCKS_DESK));
+      requireTrade(step.data.toLowerCase() === deskTradeData(p).toLowerCase());
+      const value = p.side === "buy" ? BigInt(p.amountIn) * NATIVE_PER_QUOTE_UNIT : 0n;
+      requireTrade((step.value ? BigInt(step.value) : 0n) === value);
     }
   });
   requireTrade(c.feeCap === undefined || fees <= c.feeCap);
   if (p.estimatedFee !== undefined)
     requireTrade(/^[1-9]\d{0,30}$/.test(p.estimatedFee) && BigInt(p.estimatedFee) <= fees);
-}
-
-/** Validate outer swap terms; packed executor internals are trusted to Kyber. */
-export function validateRouterCall(p: MainnetPlan, data: Hex) {
-  const c = mainnetTradeConfig();
-  const call = decodeFunctionData({ abi: mainnetRouterAbi, data });
-  requireTrade(call.functionName === "swap");
-  requireTrade(
-    encodeFunctionData({
-      abi: mainnetRouterAbi,
-      functionName: "swap",
-      args: call.args,
-    }).toLowerCase() === data.toLowerCase(),
-  );
-  const e = call.args[0],
-    d = e.desc;
-  requireTrade(sameAddress(e.callTarget, c.executor) && sameAddress(e.approveTarget, zeroAddress));
-  requireTrade(
-    sameAddress(d.srcToken, p.inputToken) &&
-      sameAddress(d.dstToken, p.outputToken) &&
-      sameAddress(d.dstReceiver, p.wallet) &&
-      d.amount === BigInt(p.amountIn) &&
-      d.minReturnAmount === BigInt(p.minimumOutput) &&
-      d.permit === "0x" &&
-      d.feeReceivers.length === 0 &&
-      d.feeAmounts.length === 0,
-  );
-  // User-approved provider trust model, matching Tokkenly's direct API flow.
-  // We request a deadline from Kyber, but do not independently decode the
-  // packed executor payload. Local review expiry prevents late submission;
-  // it is not a guarantee about expiry of an already-broadcast transaction.
-  if (d.flags === 512n) {
-    requireTrade(/^0x(?:[a-fA-F0-9]{2})+$/.test(e.targetData) && e.targetData.length <= 200000);
-    requireTrade(d.srcReceivers.length === 1 && d.srcAmounts.length === 1);
-    requireTrade(
-      sameAddress(d.srcReceivers[0], c.executor) && d.srcAmounts[0] === BigInt(p.amountIn),
-    );
-    return;
-  }
-  // Retain independent deadline checks for the standard simple-mode encoding.
-  requireTrade(d.flags === 32n, "unsupported_kyber_route_encoding");
-  requireTrade(d.srcReceivers.length === 0 && d.srcAmounts.length === 0);
-  const [inner] = decodeAbiParameters(simpleSwapParameters, e.targetData);
-  requireTrade(
-    encodeAbiParameters(simpleSwapParameters, [inner]).toLowerCase() === e.targetData.toLowerCase(),
-  );
-  requireTrade(inner.deadline === BigInt(p.deadline), "route_deadline_mismatch");
-  requireTrade(inner.positiveSlippageData === "0x");
-  requireTrade(
-    inner.firstPools.length > 0 &&
-      inner.firstPools.length === inner.firstSwapAmounts.length &&
-      inner.firstPools.length === inner.swapDatas.length,
-  );
-  requireTrade(
-    inner.firstPools.every((a) => !sameAddress(a, zeroAddress) && !sameAddress(a, p.wallet)),
-  );
-  requireTrade(
-    inner.firstSwapAmounts.every((a) => a > 0n) &&
-      inner.firstSwapAmounts.reduce((a, b) => a + b, 0n) === BigInt(p.amountIn),
-  );
 }

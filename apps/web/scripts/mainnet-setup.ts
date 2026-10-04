@@ -4,7 +4,7 @@ import { whatsappConfig } from "../src/server/whatsapp/config";
 import { WhatsAppStore } from "../src/server/whatsapp/store";
 import { mainnetWallet } from "../src/server/stocks/mainnet-orders";
 import {
-  checkMainnetRouter,
+  checkMainnetVenue,
   mainnetRpc,
   requireTrade as ensure,
 } from "../src/server/stocks/mainnet-trade";
@@ -44,13 +44,7 @@ async function main() {
       account && accounts.some((a) => a.id === account),
       "choose_active_account_with_account_flag",
     );
-    const names = [
-      "MAINNET_KYBER_EXECUTOR",
-      "MAINNET_KYBER_EXECUTOR_CODEHASH",
-      "MAINNET_ROUTER_CODEHASH",
-      "PRIVY_MAINNET_POLICY_ID",
-      "MAINNET_MAX_USDC_PER_TRADE",
-    ];
+    const names = ["PRIVY_MAINNET_POLICY_ID", "MAINNET_MAX_USDC_PER_TRADE"];
     console.log(
       "Configuration:",
       Object.fromEntries(names.map((n) => [n, process.env[n]?.trim() ? "set" : "missing"])),
@@ -74,12 +68,12 @@ async function main() {
       return;
     }
     // An empty wallet can be provisioned before trade validation and fee limits.
-    // Execution still requires checkMainnetRouter in both preparation and submission.
+    // Execution still requires checkMainnetVenue in both preparation and submission.
     const policy = process.env.PRIVY_MAINNET_POLICY_ID?.trim();
     ensure(policy, "mainnet_policy_required");
     if (!creatingWallet) {
-      await checkMainnetRouter();
-      console.log("KyberSwap router and executor code pins verified.");
+      await checkMainnetVenue();
+      console.log("ArcStocks desk proxy and implementation code pins verified.");
     }
     let wallet = mainnetWallet(store.db, account);
     if (!wallet && process.argv.includes("--create-wallet")) {

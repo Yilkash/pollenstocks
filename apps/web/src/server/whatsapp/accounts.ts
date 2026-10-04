@@ -17,7 +17,7 @@ import { migrateWalletSetup, walletSetupReply, walletAddress, readyAccount } fro
 export const CONSENT_VERSION = "pollenstocks-account-v2";
 // The welcome message carries the full disclosure, so one tap on Create account is consent.
 export const DISCLOSURE =
-  "Hi, I’m Pollenstocks 👋\nOwn real US stocks like NVIDIA and Circle with just USDC, right here in WhatsApp. No app, no seed phrase, no gas token to buy.\n\nBy tapping Create account you agree that:\n• Pollenstocks controls your wallet and sends only transactions you confirm.\n• Trades and payments on Arc use real money.\n• Stock tokens on Arc come from a third-party issuer and are not direct share ownership.\n• Anyone with access to this WhatsApp account can use your Pollenstocks account.\n\nNo funds are added. This offer expires in 10 minutes.";
+  "Hi, I’m Pollenstocks 👋\nOwn real US stocks like NVIDIA, Apple and Tesla with just USDC, right here in WhatsApp. No app, no seed phrase, no gas token to buy.\n\nBy tapping Create account you agree that:\n• Pollenstocks controls your wallet and sends only transactions you confirm.\n• Trades and payments on Arc use real money.\n• Stock tokens on Arc come from ArcStocks, a third-party issuer, and are not direct share ownership.\n• Anyone with access to this WhatsApp account can use your Pollenstocks account.\n\nNo funds are added. This offer expires in 10 minutes.";
 /** The welcome-and-consent message: one tap on Create account creates the account. */
 function accountOffer(db: DatabaseSync, sender: string) {
   // Invalidate older offers so only the newest account consent can be used.

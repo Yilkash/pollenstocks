@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { MAINNET_QUOTE, type MainnetStock } from "../networks/chain";
 
-// Reference prices for Arc stock tokens. The issuer backs each Arc token 1:1 with the
+// Reference prices for Arc stock tokens. ArcStocks backs each Arc token 1:1 with the
 // Robinhood Chain stock token of the same symbol, so Robinhood's public token bid/ask is
 // the fair market for both. Docs: docs.robinhood.com/chain/stock-token-apis/
 const API = "https://api.robinhood.com/rhj/prices/";
@@ -157,7 +157,7 @@ export function priceDeviationBps(
   const scale = 10n ** 18n;
   if (amountIn <= 0n || amountOut <= 0n) return 10_000n;
   if (side === "buy") {
-    // Off-hours quotes can show a very wide ask (AMC: bid $2.72, ask $11.80 on a weekend),
+    // Off-hours quotes can show a very wide ask (seen on a weekend: bid $2.72, ask $11.80),
     // which would wave any price through. Never judge a buy against more than bid + 5%.
     const capped = (market.bid * 105n) / 100n;
     const ask = market.ask < capped ? market.ask : capped;

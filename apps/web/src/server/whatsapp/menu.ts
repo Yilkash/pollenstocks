@@ -12,7 +12,7 @@ export const text = (body: string) => ({ type: "text", text: { body } });
 export const capabilities = [
   "Hi, I’m Pollenstocks 👋",
   "",
-  "📈 Buy and sell NVIDIA, Circle, GameStop and AMC",
+  "📈 Buy and sell NVIDIA, Tesla, Apple, Amazon, Meta, Google, the S&P 500 and the Nasdaq-100",
   "💸 Send USDC to contacts and phone numbers",
   "📋 Check balances and recent activity",
   "",

@@ -144,7 +144,7 @@ const allAssistantTools = [
   ),
   tool(
     "preview_mainnet_stock_price",
-    "Read an indicative KyberSwap mainnet price. Default network is mainnet. Omitted buy currency means USDC; sells use stock-token quantity. Reuse the current task for preview follow-ups. Explicit other currencies must not be substituted. Omit missing fields so the tool can ask. No order or signing.",
+    "Read an indicative mainnet price from the ArcStocks desk. Default network is mainnet. Omitted buy currency means USDC; sells use stock-token quantity. Reuse the current task for preview follow-ups. Explicit other currencies must not be substituted. Omit missing fields so the tool can ask. No order or signing.",
     {
       symbol: { type: "string", enum: MAINNET_STOCK_SYMBOLS },
       side: { type: "string", enum: ["buy", "sell"] },
@@ -300,7 +300,7 @@ export async function runAssistantTool(
       return text(
         "Stock tokens on Arc\n\n" +
           MAINNET_STOCK_SYMBOLS.map((s) => `• ${MAINNET_ASSETS[s].name} (${s})`).join("\n") +
-          "\n\n" +
+          "\n\nEach is backed 1:1 by the real stock token in ArcStocks' vault on Robinhood Chain; Pollenstocks checks this before every trade.\n\n" +
           "Buy example: Buy NVIDIA with 1 USDC.\n" +
           "Sell example: Sell 0.001 NVIDIA for USDC.\n" +
           mainnetTradingMessage(),

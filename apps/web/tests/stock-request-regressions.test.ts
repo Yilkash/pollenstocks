@@ -2,10 +2,8 @@ import assert from "node:assert/strict";
 import { afterEach, mock, test } from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { mainnetStockMentions } from "../src/server/stocks/stock-language";
-import { fetchMainnetRoute, KYBER_RETRY_DELAYS_MS } from "../src/server/stocks/kyber-route";
 
 // Keep retry tests fast; the attempt count is what matters here.
-KYBER_RETRY_DELAYS_MS.splice(0, KYBER_RETRY_DELAYS_MS.length, 0, 0);
 import { migrateAccounts } from "../src/server/whatsapp/accounts";
 import {
   currentTask,
@@ -229,7 +227,7 @@ test("the model may name the stock when the user describes it", async () => {
 });
 
 test("the model may not swap a stock the user named", async () => {
-  const { reply } = await tradeTool("Buy Circle with 5 USDC", {
+  const { reply } = await tradeTool("Buy Tesla with 5 USDC", {
     symbol: "NVDA",
     side: "buy",
     amount: "5",
@@ -249,69 +247,12 @@ test("a buy that mentions the price still prepares a trade", async () => {
 });
 
 test("aliases preserve boundaries and identify ambiguous multiple stocks", () => {
-  assert.deepEqual(mainnetStockMentions("encircled NVIDIAton NVDAs CircleXYZ amcx"), []);
-  assert.deepEqual(mainnetStockMentions("NVIDIA and Circle"), ["NVDA", "CRCL"]);
+  assert.deepEqual(mainnetStockMentions("NVIDIAton NVDAs TeslaXYZ metadata spyware"), []);
+  assert.deepEqual(mainnetStockMentions("NVIDIA and Tesla"), ["NVDA", "TSLA"]);
   assert.deepEqual(mainnetStockMentions("NVIDIA's shares"), ["NVDA"]);
   assert.deepEqual(mainnetStockMentions("Sell 0.003 nvdia shares"), ["NVDA"]);
-  assert.deepEqual(mainnetStockMentions("buy circel and nvdia"), ["NVDA", "CRCL"]);
+  assert.deepEqual(mainnetStockMentions("buy telsa and nvdia"), ["NVDA", "TSLA"]);
+  assert.deepEqual(mainnetStockMentions("buy google and the s&p 500"), ["GOOGL", "SPY"]);
+  assert.deepEqual(mainnetStockMentions("Nasdaq 100 or Facebook"), ["META", "QQQ"]);
   assert.deepEqual(mainnetStockMentions("application applause fbi"), []);
-});
-
-const query = new URLSearchParams({ amountIn: "200000" });
-for (const status of [429, 502, 503, 504]) {
-  test(`read-only quote retries HTTP ${status} once`, async () => {
-    let calls = 0;
-    mock.method(console, "warn", () => undefined);
-    mock.method(globalThis, "fetch", async (url: string, init?: RequestInit) => {
-      assert.match(
-        String(url),
-        /^https:\/\/aggregator-api\.kyberswap\.com\/arc\/api\/v1\/routes\?/,
-      );
-      assert.ok(!init?.method || init.method === "GET");
-      calls++;
-      return calls === 1 ? new Response(null, { status }) : Response.json({ code: 0 });
-    });
-    assert.equal((await fetchMainnetRoute(query)).status, 200);
-    assert.equal(calls, 2);
-  });
-}
-test("continued overload stops after three GETs and reports busy", async () => {
-  let calls = 0;
-  mock.method(console, "warn", () => undefined);
-  mock.method(globalThis, "fetch", async () => {
-    calls++;
-    return new Response(null, { status: 503 });
-  });
-  await assert.rejects(fetchMainnetRoute(query), /route_busy/);
-  assert.equal(calls, 3);
-});
-test("a 429 burst recovers on the third attempt", async () => {
-  let calls = 0;
-  mock.method(console, "warn", () => undefined);
-  mock.method(globalThis, "fetch", async () => {
-    calls++;
-    return calls < 3 ? new Response(null, { status: 429 }) : Response.json({ code: 0 });
-  });
-  assert.equal((await fetchMainnetRoute(query)).status, 200);
-  assert.equal(calls, 3);
-});
-test("nontransient HTTP failures are not retried", async () => {
-  let calls = 0;
-  mock.method(console, "warn", () => undefined);
-  mock.method(globalThis, "fetch", async () => {
-    calls++;
-    return new Response(null, { status: 400 });
-  });
-  await assert.rejects(fetchMainnetRoute(query), /route_unavailable/);
-  assert.equal(calls, 1);
-});
-test("network failure retries only the quote lookup", async () => {
-  let calls = 0;
-  mock.method(console, "warn", () => undefined);
-  mock.method(globalThis, "fetch", async () => {
-    calls++;
-    throw Error("network timeout");
-  });
-  await assert.rejects(fetchMainnetRoute(query), /route_unavailable/);
-  assert.equal(calls, 3);
 });

@@ -3,9 +3,13 @@ import { MAINNET_STOCK_SYMBOLS, type MainnetStock } from "../networks/chain";
 // Explicit supported aliases only; never fuzzy-match an unknown company for a trade.
 const names: Record<MainnetStock, string[]> = {
   NVDA: ["nvidia", "nvdia", "nvida", "nvidea"],
-  CRCL: ["circle", "circle internet", "circel"],
-  GME: ["gamestop", "game stop", "gamestp"],
-  AMC: ["amc entertainment", "amc theatres", "amc theaters"],
+  TSLA: ["tesla", "telsa", "tesla motors"],
+  AAPL: ["apple", "appl", "aple"],
+  AMZN: ["amazon", "amazn", "amazon.com"],
+  META: ["meta", "meta platforms", "facebook"],
+  GOOGL: ["google", "alphabet", "googl", "goog", "gogle"],
+  SPY: ["s&p 500", "s&p500", "s and p 500", "sp500", "s&p"],
+  QQQ: ["nasdaq", "nasdaq 100", "nasdaq-100", "nasdaq100"],
 };
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, "\\s*");
 const alternation = (symbol: MainnetStock) =>

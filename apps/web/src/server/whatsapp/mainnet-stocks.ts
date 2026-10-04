@@ -76,6 +76,7 @@ export async function mainnetStockListReply() {
         Object.entries(MAINNET_ASSETS)
           .map(([symbol, a]) => `• ${a.name} (${symbol})`)
           .join("\n") +
+        "\n\nEach is backed 1:1 by the real stock token in ArcStocks' vault on Robinhood Chain; Pollenstocks checks this before every trade." +
         "\n\nAsk for prices, your holdings, or a trade.\n" +
         mainnetTradingMessage(),
     );

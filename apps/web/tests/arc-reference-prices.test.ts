@@ -56,18 +56,18 @@ test("a very wide off-hours ask does not wave an overpriced buy through", () => 
 test("halted stocks and unreachable prices refuse to trade", async () => {
   mock.method(console, "warn", () => undefined);
   mock.method(globalThis, "fetch", async () =>
-    Response.json({ quotes: [{ ...nvda.quotes[0], tokenSymbol: "GME", isTradingHalt: true }] }),
+    Response.json({ quotes: [{ ...nvda.quotes[0], tokenSymbol: "TSLA", isTradingHalt: true }] }),
   );
-  await assert.rejects(fairPriceCheck("GME", "buy", usdc(5), e18), /stock_not_trading/);
+  await assert.rejects(fairPriceCheck("TSLA", "buy", usdc(5), e18), /stock_not_trading/);
   mock.restoreAll();
   mock.method(console, "warn", () => undefined);
   mock.method(globalThis, "fetch", async () => new Response(null, { status: 500 }));
-  await assert.rejects(fairPriceCheck("AMC", "buy", usdc(5), e18), /reference_unavailable/);
+  await assert.rejects(fairPriceCheck("AAPL", "buy", usdc(5), e18), /reference_unavailable/);
 });
 
 test("a quote for a different symbol is rejected", async () => {
   mock.method(console, "warn", () => undefined);
   mock.method(globalThis, "fetch", async () => Response.json(nvda));
-  await assert.rejects(mainnetReferencePrice("CRCL", true), /asset_changed/);
+  await assert.rejects(mainnetReferencePrice("META", true), /asset_changed/);
   assert.equal(toFixed18("231.71"), 231_710000000000000000n);
 });

@@ -37,7 +37,11 @@ export function mainnetTradeReviewText(p: MainnetPlan) {
     `Network fee: up to ${shortAmount(feeCeiling(p).toString(), 18, true)} ${MAINNET_NATIVE_SYMBOL}`,
     `Expires: ${expiry(p)}`,
     "",
-    "Includes token approval. Failed trades may still cost gas.",
+    // The plan is only built after the vault check passes (stocks/backing.ts).
+    "✅ Backed 1:1: vault verified on Robinhood Chain",
+    buy
+      ? "One transaction. Failed trades may still cost gas."
+      : "Includes token approval. Failed trades may still cost gas.",
   ].join("\n");
 }
 export function mainnetTradeDetailsText(p: MainnetPlan) {
@@ -46,7 +50,8 @@ export function mainnetTradeDetailsText(p: MainnetPlan) {
     outputDecimals = buy ? 18 : 6;
   return [
     `*${buy ? "Buy" : "Sell"} ${p.symbol} · Details*`,
-    "Provider: KyberSwap",
+    "Venue: ArcStocks desk on Arc",
+    "Backing: the token's Arc supply is held 1:1 in ArcStocks' vault on Robinhood Chain, checked before review and again before sending",
     `Input: ${formatUnits(BigInt(p.amountIn), inputDecimals)} ${buy ? MAINNET_QUOTE.symbol : p.symbol}`,
     `Estimated receive: ${formatUnits(BigInt(p.expectedOutput), outputDecimals)} ${buy ? p.symbol : MAINNET_QUOTE.symbol}`,
     `Minimum receive: ${formatUnits(BigInt(p.minimumOutput), outputDecimals)} ${buy ? p.symbol : MAINNET_QUOTE.symbol}`,
@@ -54,10 +59,14 @@ export function mainnetTradeDetailsText(p: MainnetPlan) {
     "",
     `Estimated network fee: ${formatEther(BigInt(p.estimatedFee ?? feeCeiling(p).toString()))} ${MAINNET_NATIVE_SYMBOL}`,
     `Maximum network fee: ${formatEther(feeCeiling(p))} ${MAINNET_NATIVE_SYMBOL}`,
-    "Network fees cover approvals and swap; you pay only gas used.",
+    buy
+      ? "You pay only the gas used."
+      : "Network fees cover the approval and the sale; you pay only gas used.",
     `Expires: ${expiry(p)}`,
     "",
-    `Confirm authorizes ${p.steps.length} transactions with real assets, including exact token approval. Failed trades can cost gas and leave an approval.`,
+    buy
+      ? "Confirm authorizes 1 transaction with real assets. Failed trades can cost gas."
+      : `Confirm authorizes ${p.steps.length} transactions with real assets, including exact token approval. Failed trades can cost gas and leave an approval.`,
     "The short review rounds received amounts down and the fee ceiling up. Exact amounts are shown here.",
     "",
     "Use Confirm or Cancel on the original review. Viewing details does not confirm or extend it.",

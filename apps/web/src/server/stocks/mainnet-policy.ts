@@ -1,10 +1,19 @@
-import { KYBER_ROUTER, mainnetRouterAbi, requireTrade, sameAddress } from "./mainnet-trade";
-import { MAINNET_ASSETS, MAINNET_CHAIN_ID, MAINNET_QUOTE } from "../networks/chain";
+import { toHex } from "viem";
+import { mainnetTradeConfig, requireTrade, sameAddress } from "./mainnet-trade";
+import { deskAbi } from "./arcstocks-desk";
+import {
+  ARCSTOCKS_DESK,
+  MAINNET_ASSETS,
+  MAINNET_CHAIN_ID,
+  MAINNET_QUOTE,
+  NATIVE_PER_QUOTE_UNIT,
+} from "../networks/chain";
 const STOCKS = Object.values(MAINNET_ASSETS);
 
-// Privy wallet policy for Pollenstocks on Arc. The wallet may only: approve USDC or one
-// of the listed stock tokens, call KyberSwap's router `swap`, and transfer USDC. Every rule
-// pins chain 5042, the exact contract, zero native value and the function name.
+// Privy wallet policy for Pollenstocks on Arc. The wallet may only: approve one of the listed
+// stock tokens, transfer USDC, and call the ArcStocks desk's `buy` (sending at most the
+// per-trade USDC cap as native value) or `sell` (no value). Every rule pins chain 5042, the
+// exact contract, the native value and the function name.
 const chainId = String(MAINNET_CHAIN_ID);
 const approveAbi = [
   {
@@ -30,7 +39,13 @@ const transferAbi = [
     outputs: [{ name: "", type: "bool" }],
   },
 ];
-function rule(name: string, to: string, functionName: string, abi: unknown) {
+function rule(
+  name: string,
+  to: string,
+  functionName: string,
+  abi: unknown,
+  value: { operator: "eq" | "lte"; value: string } = { operator: "eq", value: "0x0" },
+) {
   return {
     name,
     method: "eth_sendTransaction" as const,
@@ -51,8 +66,8 @@ function rule(name: string, to: string, functionName: string, abi: unknown) {
       {
         field_source: "ethereum_transaction" as const,
         field: "value" as const,
-        operator: "eq" as const,
-        value: "0x0",
+        operator: value.operator,
+        value: value.value,
       },
       {
         field_source: "ethereum_calldata" as const,
@@ -66,18 +81,19 @@ function rule(name: string, to: string, functionName: string, abi: unknown) {
 }
 export const stockApproveRule = (address: string) =>
   rule(`Approve ${address}`, address, "approve", approveAbi);
+const deskFunctions = deskAbi.filter((x) => x.type === "function");
+/** Largest native value a desk buy may carry: the per-trade USDC cap, in 18 decimals. */
+export const deskBuyValueCap = () => toHex(mainnetTradeConfig().inputCap * NATIVE_PER_QUOTE_UNIT);
 /** The complete policy. Generated from the token list so the policy and code cannot drift. */
 export function mainnetPolicyRules() {
   return [
-    stockApproveRule(MAINNET_QUOTE.address),
     ...STOCKS.map((t) => stockApproveRule(t.address)),
     rule(`Send ${MAINNET_QUOTE.symbol}`, MAINNET_QUOTE.address, "transfer", transferAbi),
-    rule(
-      "KyberSwap stock swap",
-      KYBER_ROUTER,
-      "swap",
-      mainnetRouterAbi.filter((x) => x.type === "function" || x.type === "event"),
-    ),
+    rule("ArcStocks desk buy", ARCSTOCKS_DESK, "buy", deskFunctions, {
+      operator: "lte",
+      value: deskBuyValueCap(),
+    }),
+    rule("ArcStocks desk sell", ARCSTOCKS_DESK, "sell", deskFunctions),
   ];
 }
 export function canonicalPolicy(x: unknown): string {
@@ -105,17 +121,18 @@ type Rule = {
   }[];
 };
 /**
- * The live policy must contain exactly the expected rules: every stock and USDC approval,
- * the Kyber swap and the USDC transfer, each once, and nothing else. `approveToken`
+ * The live policy must contain exactly the expected rules: every stock approval, the USDC
+ * transfer and the desk buy and sell, each once, and nothing else. `approveToken`
  * additionally requires the approval rule for a trade's input token.
  */
 export function validateMainnetPolicyRules(rules: Rule[], approveToken?: string) {
   const expected: [string, string][] = [
-    [MAINNET_QUOTE.address, "approve"],
     ...STOCKS.map((t): [string, string] => [t.address, "approve"]),
-    [KYBER_ROUTER, "swap"],
     [MAINNET_QUOTE.address, "transfer"],
+    [ARCSTOCKS_DESK, "buy"],
+    [ARCSTOCKS_DESK, "sell"],
   ];
+  const buyCap = deskBuyValueCap();
   const seen = new Set<string>();
   for (const rule of rules) {
     requireTrade(
@@ -123,22 +140,26 @@ export function validateMainnetPolicyRules(rules: Rule[], approveToken?: string)
         rule.method === "eth_sendTransaction" &&
         rule.conditions.length === 4,
     );
-    const eq = (source: string, field: string, value: string) =>
+    const eq = (source: string, field: string, value: string, operator = "eq") =>
       rule.conditions.some(
         (c) =>
           c.field_source === source &&
           c.field === field &&
-          c.operator === "eq" &&
+          c.operator === operator &&
           sameAddress(String(c.value), value),
       );
-    requireTrade(
-      eq("ethereum_transaction", "chain_id", chainId) && eq("ethereum_transaction", "value", "0x0"),
-    );
+    requireTrade(eq("ethereum_transaction", "chain_id", chainId));
     const match = expected.find(
       ([address, name]) =>
         eq("ethereum_transaction", "to", address) && eq("ethereum_calldata", "function_name", name),
     );
     requireTrade(match && !seen.has(match[0].toLowerCase() + match[1]));
+    // Only the desk buy carries value, capped at the per-trade limit; all else sends none.
+    requireTrade(
+      match[1] === "buy"
+        ? eq("ethereum_transaction", "value", buyCap, "lte")
+        : eq("ethereum_transaction", "value", "0x0"),
+    );
     seen.add(match[0].toLowerCase() + match[1]);
   }
   requireTrade(

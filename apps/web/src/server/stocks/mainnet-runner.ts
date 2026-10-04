@@ -11,6 +11,7 @@ import {
   formatUnits,
   formatEther,
   type Hex,
+  type PublicClient,
 } from "viem";
 import {
   MAINNET_CAIP2,
@@ -18,14 +19,16 @@ import {
   MAINNET_EXECUTION_READY,
   MAINNET_QUOTE,
   NATIVE_PER_QUOTE_UNIT,
+  type MainnetStock,
 } from "../networks/chain";
+import { verifyBacking } from "./backing";
 import { seal, unseal, senderKeyAccess } from "../whatsapp/config";
 import { text } from "../whatsapp/menu";
 import {
   mainnetRpc as rpc,
   requireTrade as ensure,
   sameAddress as same,
-  checkMainnetRouter,
+  checkMainnetVenue,
   validateMainnetPlan,
   executionGasLimit,
   broadcastGasPrice,
@@ -141,7 +144,14 @@ export async function processMainnetTrade(
       );
       ensure(walletStillMatches(db, review));
       validateMainnetPlan(p);
-      await checkMainnetRouter();
+      await checkMainnetVenue();
+      // Backing is re-checked right before the trade itself is sent.
+      if (planned.kind === "trade" && p.side !== "send")
+        await verifyBacking(rpc as PublicClient, p.symbol as MainnetStock).catch(
+          (error: unknown) => {
+            throw Error(error instanceof Error ? error.message : "backing_unavailable");
+          },
+        );
       const privy = sdk(),
         wallet = await privy.wallets().get(review.wallet.provider_id);
       ensure(
@@ -157,8 +167,10 @@ export async function processMainnetTrade(
           policy.chain_type === "ethereum" &&
           policy.version === "1.0",
       );
-      validateMainnetPolicyRules(policy.rules, p.side === "send" ? undefined : p.inputToken);
-      if (planned.kind === "trade") {
+      // Only a sell approves a token (the stock, to the desk).
+      validateMainnetPolicyRules(policy.rules, p.side === "sell" ? p.inputToken : undefined);
+      // A sell spends an exact approval to the desk; a buy pays with native USDC instead.
+      if (planned.kind === "trade" && p.side === "sell") {
         const [allowance, balance] = await Promise.all([
           rpc.readContract({
             address: p.inputToken,
@@ -175,8 +187,9 @@ export async function processMainnetTrade(
         ]);
         ensure(allowance === BigInt(p.amountIn) && balance >= BigInt(p.amountIn));
       }
+      const value = planned.value ? BigInt(planned.value) : 0n;
       const [gas, block, eth, nonce, latest, suggestedPrice] = await Promise.all([
-        rpc.estimateGas({ account: p.wallet, to: planned.to, data: planned.data, value: 0n }),
+        rpc.estimateGas({ account: p.wallet, to: planned.to, data: planned.data, value }),
         rpc.getBlock(),
         rpc.getBalance({ address: p.wallet }),
         rpc.getTransactionCount({ address: p.wallet, blockTag: "pending" }),
@@ -247,7 +260,7 @@ export async function processMainnetTrade(
             transaction: {
               chain_id: MAINNET_CHAIN_ID,
               to: planned.to,
-              value: "0x0",
+              value: toHex(value),
               data: planned.data,
               nonce: toHex(nonce),
               gas_limit: toHex(gasLimit),
@@ -361,7 +374,7 @@ export async function processMainnetTrade(
         tx.to &&
         same(tx.to, planned.to) &&
         tx.chainId === MAINNET_CHAIN_ID &&
-        tx.value === 0n &&
+        tx.value === (planned.value ? BigInt(planned.value) : 0n) &&
         tx.input === planned.data &&
         tx.nonce === step.nonce,
     );
@@ -425,7 +438,7 @@ export async function processMainnetTrade(
           "confirmed",
           p.side === "send"
             ? `Payment complete ✅\n${formatUnits(amountOut, 6)} USDC\nTo: ${p.transferTo}\nNetwork fee: ${formatEther(receipt.gasUsed * receipt.effectiveGasPrice)} USDC\nhttps://explorer.arc.io/tx/${hash}`
-            : `Trade complete ✅\n${p.side === "buy" ? "Bought" : "Received"}: ${formatUnits(amountOut, p.side === "buy" ? 18 : 6)} ${p.side === "buy" ? p.symbol : "USDC"}\nSwap network fee: ${formatEther(receipt.gasUsed * receipt.effectiveGasPrice)} USDC (approvals charged separately)\nhttps://explorer.arc.io/tx/${hash}`,
+            : `Trade complete ✅\n${p.side === "buy" ? "Bought" : "Received"}: ${formatUnits(amountOut, p.side === "buy" ? 18 : 6)} ${p.side === "buy" ? p.symbol : "USDC"}\nNetwork fee: ${formatEther(receipt.gasUsed * receipt.effectiveGasPrice)} USDC${p.side === "sell" ? " (approval charged separately)" : ""}\nhttps://explorer.arc.io/tx/${hash}`,
         );
       db.exec("COMMIT");
     } catch (e) {
@@ -458,6 +471,10 @@ export async function processMainnetTrade(
         wallet_setup_changed: "The wallet setup changed.",
         trade_disabled_or_expired: "The review expired or trading was disabled.",
         stock_not_enabled_for_selling: "Selling this stock is not enabled yet.",
+        desk_changed: "The ArcStocks desk contract changed, so trading is paused for review.",
+        desk_paused: "ArcStocks has paused its trading desk.",
+        backing_short: "This stock's 1:1 backing could not be confirmed, so it was not traded.",
+        backing_unavailable: "The 1:1 backing check could not be completed.",
       };
       const code =
         error instanceof Error && error.message in reasons ? error.message : "preflight_failed";
