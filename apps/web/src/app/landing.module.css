@@ -469,7 +469,7 @@
   }
 }
 
-/* Pollenstock additions */
+/* Pollenstocks additions */
 .brandMark {
   display: grid;
   place-items: center;
@@ -663,7 +663,7 @@
   transform: translateY(-1px);
 }
 
-/* Pollenstock: drawn chat until real screenshots exist */
+/* Pollenstocks: drawn chat until real screenshots exist */
 .phoneMock {
   justify-self: center;
   width: min(340px, 100%);

@@ -2,18 +2,18 @@ import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal-page";
 
 export const metadata: Metadata = {
-  title: "Privacy policy | Pollenstock",
+  title: "Privacy policy | Pollenstocks",
   description:
-    "How Pollenstock handles WhatsApp messages, wallet information, and privacy requests.",
+    "How Pollenstocks handles WhatsApp messages, wallet information, and privacy requests.",
 };
 
 export default function PrivacyPage() {
   return (
     <LegalPage title="Privacy policy">
       <p>
-        Pollenstock (we, us), operated by Steward Pay, provides a WhatsApp assistant and a web
+        Pollenstocks (we, us), operated by Steward Pay, provides a WhatsApp assistant and a web
         application for wallet balances, contacts, payments, and stock-token activity. This notice
-        explains how we handle information when you use these services. Contact the Pollenstock
+        explains how we handle information when you use these services. Contact the Pollenstocks
         operator at <a href="mailto:stewardchat@gmail.com">stewardchat@gmail.com</a> for privacy
         questions.
       </p>
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
       </p>
       <h2>AI chat and service providers</h2>
       <p>
-        When you use Ask Pollenstock, your message, recent conversation context, and relevant task
+        When you use Ask Pollenstocks, your message, recent conversation context, and relevant task
         details are sent to OpenServ for AI processing. Information you include in a message,
         including personal or financial details, can therefore be included in that processing.
       </p>
@@ -80,14 +80,14 @@ export default function PrivacyPage() {
       <h2>Blockchain records and phone lookup</h2>
       <p>
         Blockchain transactions, wallet addresses, token movements, and related activity are public
-        and can remain permanently accessible. Pollenstock cannot remove or alter confirmed
+        and can remain permanently accessible. Pollenstocks cannot remove or alter confirmed
         blockchain records. If you enable phone-number recipient lookup in Help &amp; settings,
-        other Pollenstock users who know your number can resolve it to your payment wallet. You can
+        other Pollenstocks users who know your number can resolve it to your payment wallet. You can
         disable this setting again.
       </p>
       <h2>Storage and retention</h2>
       <p>
-        Pollenstock stores operational data in application databases. Sensitive WhatsApp payloads
+        Pollenstocks stores operational data in application databases. Sensitive WhatsApp payloads
         are encrypted at rest, and phone identifiers are also used in keyed lookup form. Authorized
         service processes can decrypt data to operate the assistant; encryption does not make that
         data anonymous.
@@ -101,7 +101,7 @@ export default function PrivacyPage() {
       </p>
       <h2>Your choices and deletion requests</h2>
       <p>
-        You can stop messaging Pollenstock, end AI chat by typing Menu, manage saved contacts, and
+        You can stop messaging Pollenstocks, end AI chat by typing Menu, manage saved contacts, and
         change phone lookup settings. You may request access to, correction of, or deletion of your
         information by emailing <a href="mailto:stewardchat@gmail.com">stewardchat@gmail.com</a>. We
         may ask you to confirm control of the associated WhatsApp account before acting.

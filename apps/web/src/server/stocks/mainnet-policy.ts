@@ -2,7 +2,7 @@ import { KYBER_ROUTER, mainnetRouterAbi, requireTrade, sameAddress } from "./mai
 import { MAINNET_ASSETS, MAINNET_CHAIN_ID, MAINNET_QUOTE } from "../networks/chain";
 const STOCKS = Object.values(MAINNET_ASSETS);
 
-// Privy wallet policy for Pollenstock on Arc. The wallet may only: approve USDC or one
+// Privy wallet policy for Pollenstocks on Arc. The wallet may only: approve USDC or one
 // of the listed stock tokens, call KyberSwap's router `swap`, and transfer USDC. Every rule
 // pins chain 5042, the exact contract, zero native value and the function name.
 const chainId = String(MAINNET_CHAIN_ID);

@@ -106,7 +106,7 @@ export async function mainnetPortfolioReply(db: DatabaseSync, account: string) {
       ? stocks.map((a) => `${a.symbol}: ${a.formatted} tokens`).join("\n")
       : "No stock tokens yet.";
     return text(
-      `Your Pollenstock holdings · Arc\n\n${stockLines}\nUSDC: ${usdg?.formatted ?? "0"}\n\nWallet: ${wallet.address}\nStock quantities shown are raw token balances.`,
+      `Your Pollenstocks holdings · Arc\n\n${stockLines}\nUSDC: ${usdg?.formatted ?? "0"}\n\nWallet: ${wallet.address}\nStock quantities shown are raw token balances.`,
     );
   } catch {
     return text(
@@ -155,7 +155,7 @@ export async function mainnetReceiveReply(db: DatabaseSync, account: string) {
     if (code === "mainnet_policy_required")
       return text("Mainnet wallet setup is not available yet. Your testnet wallet is separate.");
     if (code === "account_not_active")
-      return text("An active Pollenstock account is required. Type Menu to get started.");
+      return text("An active Pollenstocks account is required. Type Menu to get started.");
     return text(
       "I couldn’t finish checking your mainnet wallet. Ask ‘Show my mainnet wallet’ again shortly. No funds were sent.",
     );

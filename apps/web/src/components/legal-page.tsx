@@ -5,7 +5,7 @@ export function LegalPage({ title, children }: { title: string; children: ReactN
   return (
     <main className={styles.page}>
       <nav aria-label="Privacy navigation" className={styles.nav}>
-        <a href="/">Pollenstock</a>
+        <a href="/">Pollenstocks</a>
         <a href="/privacy">Privacy policy</a>
         <a href="/data-deletion">Data deletion</a>
       </nav>

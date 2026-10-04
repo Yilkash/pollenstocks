@@ -14,9 +14,9 @@ import { actionFor, menu, text, onboardingWelcome } from "./menu";
 import { migrateWalletSetup, walletSetupReply, walletAddress, readyAccount } from "./wallet-setup";
 
 // Version the exact disclosure so later custody changes require fresh consent.
-export const CONSENT_VERSION = "pollenstock-account-v1";
+export const CONSENT_VERSION = "pollenstocks-account-v1";
 export const DISCLOSURE =
-  "Create a Pollenstock account\n\nPollenstock controls your wallet and authorizes only transactions you confirm. USDC payments and stock trades on Arc use real assets. Stock tokens on Arc are issued by a third party and backed, according to the issuer, by Robinhood Chain stock tokens; they are not direct share ownership. Control of this WhatsApp account gives access to your Pollenstock account.\n\nContinuing creates your account and requests a dedicated mainnet wallet. No funds are added. Phone-number recipient lookup is off until you choose to enable it.\n\nThis choice expires in 10 minutes.";
+  "Create a Pollenstocks account\n\nPollenstocks controls your wallet and authorizes only transactions you confirm. USDC payments and stock trades on Arc use real assets. Stock tokens on Arc are issued by a third party and backed, according to the issuer, by Robinhood Chain stock tokens; they are not direct share ownership. Control of this WhatsApp account gives access to your Pollenstocks account.\n\nContinuing creates your account and requests a dedicated mainnet wallet. No funds are added. Phone-number recipient lookup is off until you choose to enable it.\n\nThis choice expires in 10 minutes.";
 type Account = { id: string; status: string; wallet_state: string };
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 export function migrateAccounts(db: DatabaseSync) {
@@ -62,7 +62,7 @@ export function accountReply(
     .get(sender) as Account | undefined;
   if (account && account.status !== "active")
     return text(
-      "This account is paused. Contact the Pollenstock operator for recovery. No wallet action was performed.",
+      "This account is paused. Contact the Pollenstocks operator for recovery. No wallet action was performed.",
     );
   const mainnetDraft =
     account &&
@@ -100,7 +100,7 @@ export function accountReply(
   if (message.input.startsWith("stock:"))
     return account
       ? stockConfirmationReply(db, key, account.id, message.input, message.id)
-      : text("Create your Pollenstock account first. Nothing was submitted.");
+      : text("Create your Pollenstocks account first. Nothing was submitted.");
   if (message.input.startsWith("pay:"))
     return paymentReply(db, key, message) ?? text("Create your wallet first. Type Menu to begin.");
   if (["recent", "recent activity", "activity", "history"].includes(command))
@@ -120,7 +120,7 @@ export function accountReply(
   ) {
     return account
       ? assistantRoute(db, account.id, message.input, message.id)
-      : text("Create your Pollenstock account first, then choose Ask Pollenstock from Menu.");
+      : text("Create your Pollenstocks account first, then choose Ask Pollenstocks from Menu.");
   }
   if (
     message.input.startsWith("phoneprivacy:") ||
@@ -136,17 +136,17 @@ export function accountReply(
     return account
       ? phoneSettings(db, account.id, message.input, message.id)
       : text(
-          "Create your Pollenstock account first to use phone-number settings. Type Menu to begin.",
+          "Create your Pollenstocks account first to use phone-number settings. Type Menu to begin.",
         );
   }
-  // Pollenstock has no testnet. Steward's Demo USD handlers remain in the code but must not
+  // Pollenstocks has no testnet. Steward's Demo USD handlers remain in the code but must not
   // answer typed messages, or users would see Robinhood testnet wording.
   if (
     !/^[a-z]+:/.test(message.input) &&
     /\b(?:testnet|demo\s*usd|dusd|46630)\b/i.test(message.input)
   )
     return text(
-      "Pollenstock runs only on Arc mainnet with real USDC. There is no testnet or Demo USD. Type Menu to see what you can do.",
+      "Pollenstocks runs only on Arc mainnet with real USDC. There is no testnet or Demo USD. Type Menu to see what you can do.",
     );
   // Ordinary chat language reaches intent inference first. Button payloads keep
   // their deterministic handlers and cannot authorize actions through the model.
@@ -183,7 +183,7 @@ export function accountReply(
   if (message.input.startsWith("walletsetup:")) {
     return account
       ? walletSetupReply(db, sender, account.id, message.input, message.id)
-      : text("Create a Pollenstock test account first. Type Menu to begin.");
+      : text("Create a Pollenstocks test account first. Type Menu to begin.");
   }
   if (message.input.startsWith("enroll:")) {
     const match = /^enroll:(accept|cancel):([a-f0-9]{48})$/.exec(message.input);
@@ -256,7 +256,7 @@ export function accountReply(
   if (["hi", "hello", "start"].includes(command)) {
     if (!account) return onboardingWelcome();
 
-    return assistantRoute(db, account.id, "Ask Pollenstock", message.id);
+    return assistantRoute(db, account.id, "Ask Pollenstocks", message.id);
   }
   if (action && ["balance", "send", "receive", "history", "contacts"].includes(action)) {
     const wallet = account && walletAddress(db, account.id);
@@ -270,14 +270,14 @@ export function accountReply(
     return text(
       account
         ? "Your test account is ready, but wallet setup is pending. This action is not available yet; no payment was prepared or sent. Type Menu to return."
-        : "Create your Pollenstock test account first: type Create account to review the details. Wallet setup is still pending.",
+        : "Create your Pollenstocks test account first: type Create account to review the details. Wallet setup is still pending.",
     );
   }
   const chat = account && assistantRoute(db, account.id, message.input, message.id);
   if (chat) return chat;
   if (account && !action) {
     // Start the session, then handle the actual message instead of discarding it.
-    const started = assistantRoute(db, account.id, "Ask Pollenstock", message.id);
+    const started = assistantRoute(db, account.id, "Ask Pollenstocks", message.id);
     if (!assistantSession(db, account.id)) return started;
     return assistantRoute(db, account.id, message.input, message.id) ?? started;
   }

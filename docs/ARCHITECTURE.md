@@ -1,6 +1,6 @@
 # Architecture
 
-Pollenstock is one Next.js app plus two background workers (WhatsApp and transactions), started together by `scripts/start-production.mjs`. State lives in SQLite on a persistent volume.
+Pollenstocks is one Next.js app plus two background workers (WhatsApp and transactions), started together by `scripts/start-production.mjs`. State lives in SQLite on a persistent volume.
 
 ## Message flow
 

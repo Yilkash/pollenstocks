@@ -60,7 +60,7 @@ export async function prepareKyberQuote(p: QuoteInput): Promise<PreparedMainnetQ
     `https://aggregator-api.kyberswap.com/${KYBER_CHAIN_SLUG}/api/v1/route/build`,
     {
       method: "POST",
-      headers: { "content-type": "application/json", "x-client-id": "pollenstock" },
+      headers: { "content-type": "application/json", "x-client-id": "pollenstocks" },
       body: JSON.stringify({
         routeSummary: route.routeSummary,
         sender: p.wallet,
@@ -68,7 +68,7 @@ export async function prepareKyberQuote(p: QuoteInput): Promise<PreparedMainnetQ
         origin: p.wallet,
         deadline,
         slippageTolerance: 100,
-        source: "pollenstock",
+        source: "pollenstocks",
         enableGasEstimation: false,
       }),
       signal: AbortSignal.timeout(12000),

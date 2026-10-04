@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 // Set the WhatsApp number once it is connected.
 const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_LINK || "https://wa.me/";
-const GITHUB = "https://github.com/Yilkash/pollenstock";
+const GITHUB = "https://github.com/Yilkash/pollenstocks";
 
 const examples = [
   "Buy NVIDIA with 5 USDC",
@@ -66,7 +66,7 @@ const safety = [
   {
     icon: ShieldCheck,
     title: "No copycat tokens",
-    body: "Arc has fake tokens with the same names. Pollenstock trades only pinned addresses, verified on-chain before every trade.",
+    body: "Arc has fake tokens with the same names. Pollenstocks trades only pinned addresses, verified on-chain before every trade.",
   },
   {
     icon: Timer,
@@ -81,9 +81,9 @@ export default function Landing() {
     <div className={styles.page}>
       <header className={styles.nav}>
         <a className={styles.brand} href="/">
-          <img className={styles.brandLogo} src="/images/pollenstock-logo.png" alt="" />
+          <img className={styles.brandLogo} src="/images/pollenstocks-logo.png" alt="" />
           <span>
-            pollenstock<span className={styles.dot}>.</span>
+            pollenstocks<span className={styles.dot}>.</span>
           </span>
         </a>
         <nav className={styles.links} aria-label="Sections">
@@ -120,10 +120,10 @@ export default function Landing() {
               </a>
             </div>
           </div>
-          <div className={styles.phoneMock} aria-label="Example Pollenstock conversation">
+          <div className={styles.phoneMock} aria-label="Example Pollenstocks conversation">
             <div className={styles.phoneHeader}>
-              <img className={styles.brandLogo} src="/images/pollenstock-logo.png" alt="" />
-              Pollenstock
+              <img className={styles.brandLogo} src="/images/pollenstocks-logo.png" alt="" />
+              Pollenstocks
             </div>
             <div className={styles.chat}>
               <p className={styles.me}>Buy NVIDIA with 5 USDC</p>
@@ -147,7 +147,7 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className={styles.stats} aria-label="Pollenstock at a glance">
+        <section className={styles.stats} aria-label="Pollenstocks at a glance">
           {stats && (
             <>
               <div>
@@ -174,7 +174,7 @@ export default function Landing() {
 
         <section className={styles.section}>
           <p className={styles.eyebrow}>Just say it</p>
-          <h2>Things you can text Pollenstock</h2>
+          <h2>Things you can text Pollenstocks</h2>
           <div className={styles.examples}>
             {examples.map((text) => (
               <code key={text}>{text}</code>
@@ -237,15 +237,15 @@ export default function Landing() {
           <h2>Your first stock is one message away.</h2>
           <p>Say hi, create your account, add a little USDC on Arc, and start owning.</p>
           <a className={styles.primary} href={WHATSAPP}>
-            <MessageCircle size={18} /> Chat with Pollenstock
+            <MessageCircle size={18} /> Chat with Pollenstocks
           </a>
         </section>
       </main>
 
       <footer className={styles.footer}>
         <span>
-          Pollenstock by Steward Pay · Powered by SERV Reasoning · Stock tokens on Arc are issued by
-          a third party and are not direct share ownership.
+          Pollenstocks by Steward Pay · Powered by SERV Reasoning · Stock tokens on Arc are issued
+          by a third party and are not direct share ownership.
         </span>
         <nav aria-label="Footer">
           <a href={GITHUB}>

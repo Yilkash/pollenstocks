@@ -132,7 +132,7 @@ const allAssistantTools = [
   ),
   tool(
     "stock_help",
-    "Show Pollenstock's supported stock catalogue and explain price previews versus execution. Use for general stock/share/equity availability or capabilities, including misspellings, without requiring a network or amount. For a specific unsupported company, answer directly that it is unsupported rather than calling this tool. For a purchase request, collect the stock and budget with the trade preparation tool. This is the configured catalogue, not a live tradability check.",
+    "Show Pollenstocks's supported stock catalogue and explain price previews versus execution. Use for general stock/share/equity availability or capabilities, including misspellings, without requiring a network or amount. For a specific unsupported company, answer directly that it is unsupported rather than calling this tool. For a purchase request, collect the stock and budget with the trade preparation tool. This is the configured catalogue, not a live tradability check.",
   ),
   tool(
     "list_mainnet_stocks",
@@ -140,7 +140,7 @@ const allAssistantTools = [
   ),
   tool(
     "get_mainnet_stock_portfolio",
-    "Read mainnet holdings at the user's existing Pollenstock address, defaulting to mainnet unless testnet is explicitly requested. Does not activate a mainnet wallet.",
+    "Read mainnet holdings at the user's existing Pollenstocks address, defaulting to mainnet unless testnet is explicitly requested. Does not activate a mainnet wallet.",
   ),
   tool(
     "preview_mainnet_stock_price",
@@ -163,7 +163,7 @@ const allAssistantTools = [
   ),
   tool(
     "get_stock_portfolio",
-    "Read actual test-stock and USDC balances in the user's Pollenstock wallet, not their external MetaMask wallet.",
+    "Read actual test-stock and USDC balances in the user's Pollenstocks wallet, not their external MetaMask wallet.",
   ),
   tool(
     "quote_stock",
@@ -225,7 +225,7 @@ const allAssistantTools = [
     "Discard an unfinished draft or unconfirmed review. Never cancels a submitted transaction.",
   ),
 ];
-// Pollenstock has no testnet mode; Steward's Robinhood testnet stock tools stay unexposed.
+// Pollenstocks has no testnet mode; Steward's Robinhood testnet stock tools stay unexposed.
 const TESTNET_ONLY_TOOLS = ["list_test_stocks", "get_stock_portfolio", "quote_stock"];
 export const assistantTools = allAssistantTools.filter(
   (t) => !TESTNET_ONLY_TOOLS.includes(t.function.name),
@@ -494,7 +494,7 @@ export async function runAssistantTool(
           /* Preserve quantity intent even when a public quote is unavailable. */
         }
         return text(
-          `You want ${draft.desiredQuantity} ${symbol} tokens.${value}\n\nPollenstock buys by USDC budget, up to 1,000 USDC per trade. It cannot place an order for an exact token quantity.\n\nHow much USDC would you like to spend?`,
+          `You want ${draft.desiredQuantity} ${symbol} tokens.${value}\n\nPollenstocks buys by USDC budget, up to 1,000 USDC per trade. It cannot place an order for an exact token quantity.\n\nHow much USDC would you like to spend?`,
         );
       }
     }
@@ -528,8 +528,8 @@ export async function runAssistantTool(
       save(draft);
       const limit =
         draft.side === "buy"
-          ? `Pollenstock currently supports up to 1,000 USDC per stock purchase. What USDC budget would you like to use for ${symbol}?`
-          : `Pollenstock currently supports selling up to 1,000 ${symbol} tokens per trade. How many would you like to sell?`;
+          ? `Pollenstocks currently supports up to 1,000 USDC per stock purchase. What USDC budget would you like to use for ${symbol}?`
+          : `Pollenstocks currently supports selling up to 1,000 ${symbol} tokens per trade. How many would you like to sell?`;
       return text(
         (inputAmount === undefined || inputAmount <= 0n
           ? `Enter a positive amount with at most ${decimals} decimal places.\n\n`

@@ -1,6 +1,6 @@
 import { defineChain } from "viem";
 
-// Pollenstock trades tokenized US stocks on Arc mainnet (chain 5042), Circle's L1 where USDC
+// Pollenstocks trades tokenized US stocks on Arc mainnet (chain 5042), Circle's L1 where USDC
 // is also the gas token. The native balance uses 18 decimals; the USDC ERC-20 interface at
 // 0x3600… reads the same balance with 6 decimals.
 export const mainnetChain = defineChain({

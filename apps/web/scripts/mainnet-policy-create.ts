@@ -17,7 +17,7 @@ async function main() {
   }
   // The policy is generated from the configured Arc token list (stock tokens + USDC).
   const raw = JSON.stringify({
-    name: "Pollenstock Arc trades",
+    name: "Pollenstocks Arc trades",
     version: "1.0",
     chain_type: "ethereum",
     rules: mainnetPolicyRules(),
@@ -51,7 +51,7 @@ async function main() {
     const policy = await client.policies().create({
       ...template,
       owner_id: owner,
-      idempotency_key: `pollenstock-arc-policy-${digest}`,
+      idempotency_key: `pollenstocks-arc-policy-${digest}`,
     });
     state.id = policy.id;
     writeFileSync(statePath, JSON.stringify(state), { mode: 0o600 });

@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="apps/web/public/images/pollenstock-logo.png" alt="Pollenstock" width="96"/>
+<img src="apps/web/public/images/pollenstocks-logo.png" alt="Pollenstocks" width="96"/>
 
-# Pollenstock
+# Pollenstocks
 
 ### Own US stocks with just USDC, right in WhatsApp.
 
@@ -26,12 +26,12 @@ People in emerging markets want US stocks to protect their savings. Tokenized st
 
 ## ✨ The solution
 
-Pollenstock is a WhatsApp assistant on Arc:
+Pollenstocks is a WhatsApp assistant on Arc:
 
 ```text
 You:          Buy NVIDIA with 5 USDC
 
-Pollenstock:  Buy NVIDIA (NVDA)
+Pollenstocks:  Buy NVIDIA (NVDA)
               Arc
 
               Pay: 5 USDC
@@ -44,7 +44,7 @@ Pollenstock:  Buy NVIDIA (NVDA)
 
 You:          Confirm buy
 
-Pollenstock:  Trade complete ✅  https://explorer.arc.io/tx/0x…
+Pollenstocks:  Trade complete ✅  https://explorer.arc.io/tx/0x…
 ```
 
 - **One coin.** Fund your wallet with USDC and you're done: trades, payments and network fees all use it. A trade costs under one cent in fees.
@@ -84,7 +84,7 @@ How do I add money?
 | GameStop (GME) | `0x41B386E03928c70D635606C210717C19DCfC984d` |
 | AMC (AMC)      | `0x0056eD10eA5a504a2Cc9BeC93aA5Fa8258bBa0C7` |
 
-These are "• Arc Token" stock tokens from a single third-party issuer, who describes them as backed 1:1 by Robinhood Chain stock tokens. They are not direct share ownership and their liquidity on Arc is still small, so Pollenstock is built for small trades and refuses unfair prices.
+These are "• Arc Token" stock tokens from a single third-party issuer, who describes them as backed 1:1 by Robinhood Chain stock tokens. They are not direct share ownership and their liquidity on Arc is still small, so Pollenstocks is built for small trades and refuses unfair prices.
 
 ## 🏗️ Architecture
 
@@ -117,8 +117,8 @@ flowchart LR
 ## 🛠️ Run it yourself
 
 ```bash
-git clone https://github.com/Yilkash/pollenstock.git
-cd pollenstock/apps/web
+git clone https://github.com/Yilkash/pollenstocks.git
+cd pollenstocks/apps/web
 npm ci
 cp .env.example .env.local   # add your own keys; never commit this file
 npm run dev                  # website
@@ -135,10 +135,10 @@ npm run format:check && npm run typecheck && npm test && npm run build
 
 - Four stocks today, because few stock tokens trade on Arc yet. More can be added as issuers bring them (Circle has said Dinari and xStocks are coming).
 - Thin liquidity on Arc: suited to small trades; larger orders are refused when the price drifts.
-- The stock tokens come from one third-party issuer whose contracts are controlled by a single key. Pollenstock pins and verifies them but cannot vouch for the backing.
+- The stock tokens come from one third-party issuer whose contracts are controlled by a single key. Pollenstocks pins and verifies them but cannot vouch for the backing.
 
 <div align="center">
 
-**Pollenstock by Steward Pay** · Stock tokens on Arc are not direct share ownership.
+**Pollenstocks by Steward Pay** · Stock tokens on Arc are not direct share ownership.
 
 </div>

@@ -21,7 +21,7 @@ async function main() {
     console.log(
       JSON.stringify(
         {
-          name: "Pollenstock Arc trades",
+          name: "Pollenstocks Arc trades",
           version: "1.0",
           chain_type: "ethereum",
           rules: mainnetPolicyRules(),

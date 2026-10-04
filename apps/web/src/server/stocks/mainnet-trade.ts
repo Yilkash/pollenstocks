@@ -200,7 +200,7 @@ export async function prepareMainnetPlan(
   ]);
   requireTrade(decimals === input.decimals && balance >= amountIn, "insufficient_tokens");
   const id = randomUUID(),
-    orderId = keccak256(toBytes(`pollenstock-arc-v1:${wallet.toLowerCase()}:${id}`));
+    orderId = keccak256(toBytes(`pollenstocks-arc-v1:${wallet.toLowerCase()}:${id}`));
   const steps: MainnetPlan["steps"] = [];
   requireTrade(
     typeof block.baseFeePerGas === "bigint" && block.baseFeePerGas >= 0n && suggestedPrice > 0n,
@@ -337,7 +337,7 @@ export async function prepareMainnetTransfer(
   const id = randomUUID();
   const plan: MainnetPlan = {
     id,
-    orderId: keccak256(toBytes(`pollenstock-arc-v1:${wallet.toLowerCase()}:${id}`)),
+    orderId: keccak256(toBytes(`pollenstocks-arc-v1:${wallet.toLowerCase()}:${id}`)),
     wallet,
     router: KYBER_ROUTER,
     symbol: MAINNET_QUOTE.symbol,
@@ -382,7 +382,7 @@ export function validateMainnetPlan(p: MainnetPlan) {
     );
     requireTrade(
       /^[a-f0-9-]{36}$/.test(p.id) &&
-        p.orderId === keccak256(toBytes(`pollenstock-arc-v1:${p.wallet.toLowerCase()}:${p.id}`)),
+        p.orderId === keccak256(toBytes(`pollenstocks-arc-v1:${p.wallet.toLowerCase()}:${p.id}`)),
     );
     requireTrade(Number.isSafeInteger(p.deadline) && p.deadline > 0 && p.steps.length === 1);
     requireTrade(
@@ -422,7 +422,7 @@ export function validateMainnetPlan(p: MainnetPlan) {
   requireTrade(stock && ["buy", "sell"].includes(p.side) && isAddress(p.wallet));
   requireTrade(
     /^[a-f0-9-]{36}$/.test(p.id) &&
-      p.orderId === keccak256(toBytes(`pollenstock-arc-v1:${p.wallet.toLowerCase()}:${p.id}`)),
+      p.orderId === keccak256(toBytes(`pollenstocks-arc-v1:${p.wallet.toLowerCase()}:${p.id}`)),
   );
   requireTrade(Number.isSafeInteger(p.deadline) && p.deadline > 0);
   requireTrade(BigInt(p.amountIn) <= (p.side === "buy" ? 1000_000000n : 1000n * 10n ** 18n));

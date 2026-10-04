@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "Pollenstock — Own US stocks with just USDC on WhatsApp",
+  title: "Pollenstocks — Own US stocks with just USDC on WhatsApp",
   description:
     "Buy NVIDIA, Circle, GameStop and AMC stock tokens with just USDC on Arc, by chatting on WhatsApp. USDC pays the network fee too: no app, no seed phrase, no gas token.",
 };

@@ -132,7 +132,7 @@ export async function mainnetAction(
   const account = db
     .prepare("SELECT id FROM wa_accounts WHERE sender=? AND status='active'")
     .get(senderLookup(phone, key)) as { id: string } | undefined;
-  if (!account) return text("Create your Pollenstock account first.");
+  if (!account) return text("Create your Pollenstocks account first.");
   if (action === "receive") return mainnetReceiveReply(db, account.id);
   if (action === "balance") return mainnetPortfolioReply(db, account.id);
   if (action === "history") return mainnetTradeStatusReply(db, account.id);

@@ -1,4 +1,4 @@
-# Contributing to Pollenstock
+# Contributing to Pollenstocks
 
 ## Working conventions
 

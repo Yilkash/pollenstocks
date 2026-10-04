@@ -26,7 +26,7 @@ export async function fetchMainnetRoute(query: URLSearchParams): Promise<Respons
       response = await fetch(
         `https://aggregator-api.kyberswap.com/${KYBER_CHAIN_SLUG}/api/v1/routes?${query}`,
         {
-          headers: { "x-client-id": "pollenstock" },
+          headers: { "x-client-id": "pollenstocks" },
           signal: AbortSignal.timeout(12000),
           redirect: "error",
           cache: "no-store",

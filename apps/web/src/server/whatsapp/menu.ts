@@ -1,5 +1,5 @@
 export const actions = [
-  ["chat", "Ask Pollenstock"],
+  ["chat", "Ask Pollenstocks"],
   ["create", "Create account"],
   ["balance", "View balance"],
   ["send", "Send payment"],
@@ -10,7 +10,7 @@ export const actions = [
 ] as const;
 export const text = (body: string) => ({ type: "text", text: { body } });
 export const capabilities = [
-  "Hi, I’m Pollenstock 👋",
+  "Hi, I’m Pollenstocks 👋",
   "",
   "📈 Buy and sell NVIDIA, Circle, GameStop and AMC",
   "💸 Send USDC to contacts and phone numbers",
@@ -25,7 +25,7 @@ export function onboardingWelcome() {
     interactive: {
       type: "button",
       body: {
-        text: "Hi, I’m Pollenstock 👋\nOwn real US stocks like NVIDIA and Circle with just USDC, right here in WhatsApp. No app, no seed phrase, and no gas token to buy.\n\nCreate your account to begin. Trades use real assets.",
+        text: "Hi, I’m Pollenstocks 👋\nOwn real US stocks like NVIDIA and Circle with just USDC, right here in WhatsApp. No app, no seed phrase, and no gas token to buy.\n\nCreate your account to begin. Trades use real assets.",
       },
       action: {
         buttons: [{ type: "reply", reply: { id: "menu:create", title: "Create account" } }],
@@ -42,14 +42,14 @@ export function menu(hasAccount = false) {
         text:
           capabilities +
           (hasAccount
-            ? "\n\nChoose a shortcut, or Ask Pollenstock to chat. OpenServ processes chat messages, recent context and task details."
+            ? "\n\nChoose a shortcut, or Ask Pollenstocks to chat. OpenServ processes chat messages, recent context and task details."
             : "\n\nChoose Create account to begin."),
       },
       action: {
         button: "Open menu",
         sections: [
           {
-            title: "Pollenstock",
+            title: "Pollenstocks",
             rows: actions.map(([id, title]) => ({
               id: "menu:" + id,
               title: id === "create" && hasAccount ? "My account" : title,
@@ -87,17 +87,17 @@ export function reply(input: string) {
   const action = actionFor(input);
   if (action === "create")
     return text(
-      "Create your Pollenstock account to get a mainnet wallet. Transactions require your confirmation. Type Menu to begin.",
+      "Create your Pollenstocks account to get a mainnet wallet. Transactions require your confirmation. Type Menu to begin.",
     );
   if (action === "help" || command === "help")
     return text(
       "Help\n\n• Payments: review, then confirm.\n• Contacts: save names and addresses.\n• Phone payments: recipient lookup must be enabled.\n• Limits: 1,000 USDC per payment.\n\nMainnet payments use real USDC. Never share wallet secrets.\nType Menu to return.",
     );
   if (action === "chat")
-    return text("Create your account first, then choose Ask Pollenstock to chat.");
+    return text("Create your account first, then choose Ask Pollenstocks to chat.");
   if (action)
     return text(
-      "This feature needs a Pollenstock wallet. Wallet setup is not available yet, and no payment has been prepared or sent. Type Menu to return.",
+      "This feature needs a Pollenstocks wallet. Wallet setup is not available yet, and no payment has been prepared or sent. Type Menu to return.",
     );
   return menu();
 }

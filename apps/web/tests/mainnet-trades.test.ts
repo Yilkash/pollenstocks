@@ -35,7 +35,7 @@ process.env.MAINNET_MAX_FEE_WEI = "1000000000000000";
 function plan(): MainnetPlan {
   const id = "11111111-1111-4111-8111-111111111111",
     deadline = Math.floor(Date.now() / 1000) + 200;
-  const orderId = keccak256(toBytes(`pollenstock-arc-v1:${wallet.toLowerCase()}:${id}`));
+  const orderId = keccak256(toBytes(`pollenstocks-arc-v1:${wallet.toLowerCase()}:${id}`));
   return {
     id,
     orderId,
