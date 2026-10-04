@@ -64,8 +64,9 @@ export default function PrivacyPage() {
           <strong>Railway</strong> hosts the application and its databases.
         </li>
         <li>
-          <strong>KyberSwap and blockchain infrastructure providers</strong> process quote, balance,
-          and transaction requests, including relevant wallet addresses and trade details.
+          <strong>Blockchain infrastructure providers</strong> (Arc and Robinhood Chain) process
+          quote, balance, and transaction requests, including relevant wallet addresses and trade
+          details.
         </li>
         <li>
           <strong>Google</strong> provides fonts used by the website and Gmail for support email.

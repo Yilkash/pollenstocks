@@ -21,7 +21,7 @@ const GITHUB = "https://github.com/Yilkash/pollenstocks";
 
 const examples = [
   "Buy NVIDIA with 5 USDC",
-  "What would 10 USDC get me in Circle?",
+  "What would 10 USDC get me in Tesla?",
   "Sell 0.01 NVIDIA",
   "What are the prices?",
   "Show my stocks",
@@ -41,8 +41,8 @@ const steps = [
   },
   {
     icon: Scale,
-    title: "Checked against the market",
-    body: "The KyberSwap route on Arc is compared with Robinhood's live bid and ask. Unfair prices are refused.",
+    title: "Backing and price checked",
+    body: "Before you see a quote, Pollenstocks confirms the stock is held 1:1 in ArcStocks' vault on Robinhood Chain and compares the price with Robinhood's live bid and ask.",
   },
   {
     icon: BadgeCheck,
@@ -60,12 +60,12 @@ const safety = [
   {
     icon: Scale,
     title: "Fair price or nothing",
-    body: "Any route more than 2% worse than Robinhood's live market is refused, and halted stocks are skipped.",
+    body: "Any price more than 2% worse than Robinhood's live market is refused, and halted stocks are skipped.",
   },
   {
     icon: ShieldCheck,
-    title: "No copycat tokens",
-    body: "Arc has fake tokens with the same names. Pollenstocks trades only pinned addresses, verified on-chain before every trade.",
+    title: "Backed 1:1, proven live",
+    body: "Each token's supply on Arc is checked against ArcStocks' vault on Robinhood Chain before every trade. If it isn't fully backed, Pollenstocks won't trade it.",
   },
   {
     icon: Timer,
@@ -107,8 +107,9 @@ export default function Landing() {
               Own US stocks with just <span className={styles.highlight}>USDC</span>.
             </h1>
             <p className={styles.lead}>
-              Buy NVIDIA, Circle, GameStop and AMC right inside WhatsApp. On Arc, USDC also pays the
-              network fee, so it is the only coin you ever need.
+              Buy NVIDIA, Tesla, Apple, Amazon, Meta, Google, the S&P 500 and the Nasdaq-100 right
+              inside WhatsApp. On Arc, USDC also pays the network fee, so it is the only coin you
+              ever need.
             </p>
             <div className={styles.ctas}>
               <a className={styles.primary} href={WHATSAPP}>
@@ -134,9 +135,11 @@ export default function Landing() {
                 <br />
                 Pay: 5 USDC
                 <br />
-                Receive: ≈ 0.02161 NVDA
+                Receive: ≈ 0.02121 NVDA
                 <br />
                 Network fee: up to 0.01 USDC
+                <br />
+                ✅ Backed 1:1: vault verified
                 <br />
                 <b>[ Confirm buy ]</b>
               </p>
