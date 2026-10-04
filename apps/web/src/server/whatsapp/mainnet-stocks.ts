@@ -108,7 +108,14 @@ export async function mainnetPortfolioReply(db: DatabaseSync, account: string) {
     return text(
       `Your Pollenstocks holdings · Arc\n\n${stockLines}\nUSDC: ${usdg?.formatted ?? "0"}\n\nWallet: ${wallet.address}\nStock quantities shown are raw token balances.`,
     );
-  } catch {
+  } catch (error) {
+    console.warn("Balance read failed", {
+      reason: error instanceof Error ? error.message.slice(0, 200) : "unknown",
+      cause:
+        error instanceof Error && error.cause instanceof Error
+          ? error.cause.message.slice(0, 200)
+          : null,
+    });
     return text(
       "I couldn’t read reliable mainnet balances right now. Please try again. No transaction was submitted.",
     );

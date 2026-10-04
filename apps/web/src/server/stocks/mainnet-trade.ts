@@ -34,8 +34,11 @@ export const mainnetRpc = createPublicClient({
   chain: mainnetChain,
   transport: http(mainnetChain.rpcUrls.default.http[0], {
     timeout: 10000,
-    retryCount: 1,
-    retryDelay: 300,
+    retryCount: 3,
+    retryDelay: 500,
+    // One HTTP request per burst of reads: fewer rate-limit hits from shared cloud IPs, and
+    // every read in a burst lands on the same RPC node.
+    batch: { batchSize: 50, wait: 10 },
   }),
 });
 export const KYBER_ROUTER = "0x6131B5fae19EA4f9D964eAc0408E4408b66337b5" as const;
