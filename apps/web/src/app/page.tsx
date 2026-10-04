@@ -5,30 +5,28 @@ import {
   Github,
   Lock,
   MessageCircle,
-  Route,
+  Scale,
   ShieldCheck,
   Timer,
-  Wallet,
 } from "lucide-react";
 import { publicStats } from "@/server/public-stats";
-import { MAINNET_STOCK_SYMBOLS } from "@/server/networks/chain";
+import { MAINNET_ASSETS, MAINNET_STOCK_SYMBOLS } from "@/server/networks/chain";
 import styles from "./landing.module.css";
+import { ThemeToggle } from "./theme-toggle";
 
 export const dynamic = "force-dynamic";
 
-const WHATSAPP = "https://wa.me/2348051064171?text=Hi";
-const GITHUB = "https://github.com/Yilkash/steward";
-const tx = (hash: string) => `https://robinhoodchain.blockscout.com/tx/${hash}`;
+// Set the WhatsApp number once it is connected.
+const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_LINK || "https://wa.me/";
+const GITHUB = "https://github.com/Yilkash/pollenstock";
 
 const examples = [
-  "Buy AAPL with 0.5 USDG",
-  "What would 1 USDG get me in Tesla?",
-  "Sell 0.001 Apple shares",
-  "Show my mainnet stocks",
-  "Send 5 USDG to Ada",
-  "Buy SPY with 2 USDG",
-  "Buy Microsoft with 1 USDG",
+  "Buy NVIDIA with 5 USDC",
+  "What would 10 USDC get me in Circle?",
+  "Sell 0.01 NVIDIA",
   "What are the prices?",
+  "Show my stocks",
+  "Send 2 USDC to Ada",
 ];
 
 const steps = [
@@ -39,18 +37,18 @@ const steps = [
   },
   {
     icon: Bot,
-    title: "AI finds the action",
-    body: "SERV Reasoning picks the right tool, with a prompt-injection guard on every message.",
+    title: "AI understands you",
+    body: "SERV Reasoning turns your message into the right action, with a prompt-injection guard on every message.",
   },
   {
-    icon: Route,
-    title: "Code checks the trade",
-    body: "Best route via KyberSwap or LI.FI. Contracts, amounts, minimum output and fees are verified in code.",
+    icon: Scale,
+    title: "Checked against the market",
+    body: "The KyberSwap route on Arc is compared with Robinhood's live bid and ask. Unfair prices are refused.",
   },
   {
     icon: BadgeCheck,
     title: "You tap Confirm",
-    body: "The trade settles on Robinhood Chain and you get a receipt with an explorer link.",
+    body: "The trade settles on Arc in under a second and you get an explorer receipt in the chat.",
   },
 ];
 
@@ -61,34 +59,19 @@ const safety = [
     body: "No tool can confirm or submit a transaction. Only your button press can.",
   },
   {
-    icon: Wallet,
-    title: "Your own wallet",
-    body: "Each user gets a Privy wallet whose policy only allows approved contracts and functions.",
+    icon: Scale,
+    title: "Fair price or nothing",
+    body: "Any route more than 2% worse than Robinhood's live market is refused, and halted stocks are skipped.",
   },
   {
     icon: ShieldCheck,
-    title: "Exact reviews",
-    body: "Every review shows what you pay, what you get, the minimum and the maximum network fee.",
+    title: "No copycat tokens",
+    body: "Arc has fake tokens with the same names. Pollenstock trades only pinned addresses, verified on-chain before every trade.",
   },
   {
     icon: Timer,
-    title: "Single-use, expiring",
-    body: "Reviews expire after 4 minutes and each Confirm button works once.",
-  },
-];
-
-const proof = [
-  {
-    label: "Buy AAPL with 0.5 USDG",
-    hash: "0x6f92e708761a6a7da54315908a31d9dcf814fde569c58b4f5b1867bb9640af0c",
-  },
-  {
-    label: "Buy AAPL with 0.5 USDG",
-    hash: "0x5091fac8af4ae6a7165664b95f32b7127557fee6b57ef5144e26210f285ad8d9",
-  },
-  {
-    label: "Buy AAPL",
-    hash: "0x9a875b3943b63bd02ab79808ed1bb27b9e75720a7836b0f46bce4c81e374e091",
+    title: "Exact, expiring reviews",
+    body: "Every review shows the minimum received and maximum fee, expires in 4 minutes, and confirms once.",
   },
 ];
 
@@ -98,66 +81,73 @@ export default function Landing() {
     <div className={styles.page}>
       <header className={styles.nav}>
         <a className={styles.brand} href="/">
-          <img className={styles.brandLogo} src="/images/steward-logo.png" alt="" />
+          <img className={styles.brandLogo} src="/images/pollenstock-logo.png" alt="" />
           <span>
-            steward<span className={styles.dot}>.</span>
+            pollenstock<span className={styles.dot}>.</span>
           </span>
         </a>
         <nav className={styles.links} aria-label="Sections">
           <a href="#how">How it works</a>
+          <a href="#one-coin">One coin</a>
           <a href="#safety">Safety</a>
-          <a href="#proof">Proof</a>
           <a href={GITHUB}>GitHub</a>
         </nav>
-        <a className={styles.navCta} href={WHATSAPP}>
-          <MessageCircle size={16} /> Chat now
-        </a>
+        <div className={styles.navEnd}>
+          <ThemeToggle />
+          <a className={styles.navCta} href={WHATSAPP}>
+            <MessageCircle size={16} /> Chat now
+          </a>
+        </div>
       </header>
 
       <main className={styles.main}>
         <section className={styles.hero}>
-          <div className={styles.heroText}>
-            <p className={styles.eyebrow}>Live on Robinhood Chain mainnet</p>
+          <div>
+            <p className={styles.eyebrow}>Tokenized US stocks · Arc</p>
             <h1>
-              Buy stocks by <span className={styles.highlight}>texting</span> on WhatsApp.
+              Own US stocks with just <span className={styles.highlight}>USDC</span>.
             </h1>
             <p className={styles.lead}>
-              Trade Apple, Tesla, NVIDIA, the S&P 500 and more with USDG, just by chatting. Steward
-              shows you the exact deal, and nothing moves until you tap Confirm.
+              Buy NVIDIA, Circle, GameStop and AMC right inside WhatsApp. On Arc, USDC also pays the
+              network fee, so it is the only coin you ever need.
             </p>
             <div className={styles.ctas}>
               <a className={styles.primary} href={WHATSAPP}>
                 <MessageCircle size={18} /> Start on WhatsApp
               </a>
-              <a className={styles.secondary} href="#proof">
-                See real trades <ArrowUpRight size={16} />
+              <a className={styles.secondary} href="#one-coin">
+                Why one coin matters <ArrowUpRight size={16} />
               </a>
             </div>
-            <div className={styles.chat} aria-label="Example conversation">
-              <p className={styles.me}>Buy AAPL with 0.5 USDG</p>
+          </div>
+          <div className={styles.phoneMock} aria-label="Example Pollenstock conversation">
+            <div className={styles.phoneHeader}>
+              <img className={styles.brandLogo} src="/images/pollenstock-logo.png" alt="" />
+              Pollenstock
+            </div>
+            <div className={styles.chat}>
+              <p className={styles.me}>Buy NVIDIA with 5 USDC</p>
               <p className={styles.bot}>
-                Pay 0.5 USDG · Receive ≈ 0.00147 AAPL
+                <b>Buy NVIDIA (NVDA)</b>
+                <br />
+                Arc
+                <br />
+                <br />
+                Pay: 5 USDC
+                <br />
+                Receive: ≈ 0.02161 NVDA
+                <br />
+                Network fee: up to 0.01 USDC
                 <br />
                 <b>[ Confirm buy ]</b>
               </p>
-              <p className={styles.bot}>Trade complete ✅</p>
+              <p className={styles.me}>Confirm buy</p>
+              <p className={styles.bot}>Trade complete ✅ Arc explorer receipt ↗</p>
             </div>
-          </div>
-          <div className={styles.phones}>
-            <img
-              src="/images/whatsapp-sell-review.jpg"
-              alt="Steward in WhatsApp showing an exact review to sell 0.001 AAPL"
-              className={styles.phoneBack}
-            />
-            <img
-              src="/images/whatsapp-buy-receipt.jpg"
-              alt="Steward in WhatsApp confirming an AAPL buy with an explorer link"
-              className={styles.phoneFront}
-            />
           </div>
         </section>
 
-        <section className={styles.stats} aria-label="Steward at a glance">
+        <section className={styles.stats} aria-label="Pollenstock at a glance">
           {stats && (
             <>
               <div>
@@ -166,23 +156,25 @@ export default function Landing() {
               </div>
               <div>
                 <b>{stats.confirmed}</b>
-                <span>confirmed mainnet trades and payments</span>
+                <span>confirmed trades and payments on Arc</span>
               </div>
             </>
           )}
           <div>
             <b>{MAINNET_STOCK_SYMBOLS.length}</b>
-            <span>stocks and ETFs, from Apple to the S&amp;P 500</span>
+            <span>
+              stocks: {MAINNET_STOCK_SYMBOLS.map((s) => MAINNET_ASSETS[s].name).join(", ")}
+            </span>
           </div>
           <div>
-            <b>24/7</b>
-            <span>trading, settled in seconds</span>
+            <b>1</b>
+            <span>coin for everything: USDC</span>
           </div>
         </section>
 
         <section className={styles.section}>
           <p className={styles.eyebrow}>Just say it</p>
-          <h2>Things you can text Steward</h2>
+          <h2>Things you can text Pollenstock</h2>
           <div className={styles.examples}>
             {examples.map((text) => (
               <code key={text}>{text}</code>
@@ -192,7 +184,7 @@ export default function Landing() {
 
         <section id="how" className={styles.section}>
           <p className={styles.eyebrow}>How it works</p>
-          <h2>AI suggests. Code verifies. You confirm.</h2>
+          <h2>AI understands. Code checks. You confirm.</h2>
           <div className={styles.grid4}>
             {steps.map(({ icon: Icon, title, body }, index) => (
               <article key={title} className={styles.card}>
@@ -203,6 +195,28 @@ export default function Landing() {
               </article>
             ))}
           </div>
+        </section>
+
+        <section id="one-coin" className={styles.section}>
+          <p className={styles.eyebrow}>Why Arc</p>
+          <h2>No second coin for gas.</h2>
+          <p className={styles.sectionLead}>
+            On most chains, a new user must first buy ETH or BNB just to pay fees, before they can
+            buy their first stock. That is where most people give up. On Arc, Circle's chain, the
+            network fee is paid in USDC. Fund your wallet with USDC and you are done.
+          </p>
+          <ul className={styles.comparison}>
+            <li className={styles.bad}>
+              <code>Other chains</code>
+              <span>Dollar coin + gas coin</span>
+              <b>Two coins to buy before your first trade</b>
+            </li>
+            <li className={styles.best}>
+              <code>Arc</code>
+              <span>USDC only</span>
+              <b>One coin. A trade costs under one cent in fees.</b>
+            </li>
+          </ul>
         </section>
 
         <section id="safety" className={`${styles.section} ${styles.dark}`}>
@@ -219,43 +233,24 @@ export default function Landing() {
           </div>
         </section>
 
-        <section id="proof" className={styles.section}>
-          <p className={styles.eyebrow}>Don’t trust us, check the chain</p>
-          <h2>Real trades on Robinhood Chain</h2>
-          <ul className={styles.proof}>
-            {proof.map(({ label, hash }) => (
-              <li key={hash}>
-                <span>{label}</span>
-                <a href={tx(hash)}>
-                  <code>
-                    {hash.slice(0, 10)}…{hash.slice(-6)}
-                  </code>
-                  <ArrowUpRight size={15} />
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-
         <section className={styles.final}>
           <h2>Your first stock is one message away.</h2>
-          <p>Say hi, create your account, fund it with a little USDG and ETH, and start trading.</p>
+          <p>Say hi, create your account, add a little USDC on Arc, and start owning.</p>
           <a className={styles.primary} href={WHATSAPP}>
-            <MessageCircle size={18} /> Chat with Steward
+            <MessageCircle size={18} /> Chat with Pollenstock
           </a>
         </section>
       </main>
 
       <footer className={styles.footer}>
         <span>
-          Steward · Powered by SERV Reasoning · Stock tokens are Robinhood Chain tokens, not direct
-          share ownership.
+          Pollenstock by Steward Pay · Powered by SERV Reasoning · Stock tokens on Arc are issued by
+          a third party and are not direct share ownership.
         </span>
         <nav aria-label="Footer">
           <a href={GITHUB}>
             <Github size={14} /> GitHub
           </a>
-          <a href="/testnet">Testnet web demo</a>
           <a href="/privacy">Privacy</a>
           <a href="/data-deletion">Data deletion</a>
         </nav>
