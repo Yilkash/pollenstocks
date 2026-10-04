@@ -10,13 +10,41 @@ import { migratePhoneRecipients, phoneSettings } from "./phone-recipients";
 import { migrateContacts, contactsReply } from "./contacts";
 import { migratePayments, paymentReply } from "./payments";
 import { senderLookup } from "./config";
-import { actionFor, menu, text, onboardingWelcome } from "./menu";
+import { actionFor, menu, text } from "./menu";
 import { migrateWalletSetup, walletSetupReply, walletAddress, readyAccount } from "./wallet-setup";
 
 // Version the exact disclosure so later custody changes require fresh consent.
-export const CONSENT_VERSION = "pollenstocks-account-v1";
+export const CONSENT_VERSION = "pollenstocks-account-v2";
+// The welcome message carries the full disclosure, so one tap on Create account is consent.
 export const DISCLOSURE =
-  "Create a Pollenstocks account\n\nPollenstocks controls your wallet and authorizes only transactions you confirm. USDC payments and stock trades on Arc use real assets. Stock tokens on Arc are issued by a third party and backed, according to the issuer, by Robinhood Chain stock tokens; they are not direct share ownership. Control of this WhatsApp account gives access to your Pollenstocks account.\n\nContinuing creates your account and requests a dedicated mainnet wallet. No funds are added. Phone-number recipient lookup is off until you choose to enable it.\n\nThis choice expires in 10 minutes.";
+  "Hi, I’m Pollenstocks 👋\nOwn real US stocks like NVIDIA and Circle with just USDC, right here in WhatsApp. No app, no seed phrase, no gas token to buy.\n\nBy tapping Create account you agree that:\n• Pollenstocks controls your wallet and sends only transactions you confirm.\n• Trades and payments on Arc use real money.\n• Stock tokens on Arc come from a third-party issuer and are not direct share ownership.\n• Anyone with access to this WhatsApp account can use your Pollenstocks account.\n\nNo funds are added. This offer expires in 10 minutes.";
+/** The welcome-and-consent message: one tap on Create account creates the account. */
+function accountOffer(db: DatabaseSync, sender: string) {
+  // Invalidate older offers so only the newest account consent can be used.
+  db.prepare(
+    "UPDATE wa_account_consents SET consumed=?,outcome='superseded' WHERE sender=? AND consumed IS NULL",
+  ).run(Date.now(), sender);
+  const token = randomBytes(24).toString("hex");
+  db.prepare(
+    "INSERT INTO wa_account_consents(token_hash,sender,version,expires) VALUES(?,?,?,?)",
+  ).run(digest(token), sender, CONSENT_VERSION, Date.now() + 10 * 60_000);
+  return {
+    type: "interactive",
+    interactive: {
+      type: "button",
+      body: { text: DISCLOSURE },
+      action: {
+        buttons: [
+          {
+            type: "reply",
+            reply: { id: "enroll:accept:" + token, title: "Create account" },
+          },
+          { type: "reply", reply: { id: "enroll:cancel:" + token, title: "Cancel" } },
+        ],
+      },
+    },
+  };
+}
 type Account = { id: string; status: string; wallet_state: string };
 const digest = (value: string) => createHash("sha256").update(value).digest("hex");
 export function migrateAccounts(db: DatabaseSync) {
@@ -227,34 +255,11 @@ export function accountReply(
     ["my account", "menu:account", "account", "can i see the account"].includes(command)
   ) {
     if (account) return { _steward_type: "mainnet_action", action: "receive" };
-    // Invalidate older offers so only the newest account consent can be used.
-    db.prepare(
-      "UPDATE wa_account_consents SET consumed=?,outcome='superseded' WHERE sender=? AND consumed IS NULL",
-    ).run(Date.now(), sender);
-    const token = randomBytes(24).toString("hex");
-    db.prepare(
-      "INSERT INTO wa_account_consents(token_hash,sender,version,expires) VALUES(?,?,?,?)",
-    ).run(digest(token), sender, CONSENT_VERSION, Date.now() + 10 * 60_000);
-    return {
-      type: "interactive",
-      interactive: {
-        type: "button",
-        body: { text: DISCLOSURE },
-        action: {
-          buttons: [
-            {
-              type: "reply",
-              reply: { id: "enroll:accept:" + token, title: "Create account" },
-            },
-            { type: "reply", reply: { id: "enroll:cancel:" + token, title: "Cancel" } },
-          ],
-        },
-      },
-    };
+    return accountOffer(db, sender);
   }
   if (command === "menu") return menu(!!account);
   if (["hi", "hello", "start"].includes(command)) {
-    if (!account) return onboardingWelcome();
+    if (!account) return accountOffer(db, sender);
 
     return assistantRoute(db, account.id, "Ask Pollenstocks", message.id);
   }
@@ -281,6 +286,6 @@ export function accountReply(
     if (!assistantSession(db, account.id)) return started;
     return assistantRoute(db, account.id, message.input, message.id) ?? started;
   }
-  if (!account && !action) return onboardingWelcome();
+  if (!account && !action) return accountOffer(db, sender);
   return action || command === "help" ? null : menu(!!account);
 }

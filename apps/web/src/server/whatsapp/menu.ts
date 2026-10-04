@@ -19,20 +19,6 @@ export const capabilities = [
   "Everything uses USDC on Arc, including network fees.",
   "Payments and trades require confirmation.",
 ].join("\n");
-export function onboardingWelcome() {
-  return {
-    type: "interactive",
-    interactive: {
-      type: "button",
-      body: {
-        text: "Hi, I’m Pollenstocks 👋\nOwn real US stocks like NVIDIA and Circle with just USDC, right here in WhatsApp. No app, no seed phrase, and no gas token to buy.\n\nCreate your account to begin. Trades use real assets.",
-      },
-      action: {
-        buttons: [{ type: "reply", reply: { id: "menu:create", title: "Create account" } }],
-      },
-    },
-  };
-}
 export function menu(hasAccount = false) {
   return {
     type: "interactive",
