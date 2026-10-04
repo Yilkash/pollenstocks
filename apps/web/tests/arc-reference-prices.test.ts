@@ -71,3 +71,10 @@ test("a quote for a different symbol is rejected", async () => {
   await assert.rejects(mainnetReferencePrice("META", true), /asset_changed/);
   assert.equal(toFixed18("231.71"), 231_710000000000000000n);
 });
+
+test("share amounts show at most 6 decimals and never round a holding to zero", async () => {
+  const { shareAmount } = await import("../src/server/whatsapp/mainnet-stocks");
+  assert.equal(shareAmount(2242108295043676n), "0.002242");
+  assert.equal(shareAmount(10n ** 18n), "1");
+  assert.equal(shareAmount(5n), "< 0.000001");
+});

@@ -16,6 +16,12 @@ import {
   referenceDollars,
 } from "../stocks/reference-price";
 
+/** Share count for display: at most 6 decimals, rounded down, trailing zeros dropped. */
+export function shareAmount(balance: bigint) {
+  const trimmed = (balance / 10n ** 12n) * 10n ** 12n;
+  const shown = formatUnits(trimmed, 18);
+  return shown === "0" && balance > 0n ? "< 0.000001" : shown;
+}
 export const mainnetTradingMessage = () =>
   MAINNET_EXECUTION_READY && process.env.MAINNET_STOCK_TRADING_ENABLED === "true"
     ? "Trades need your confirmation."
@@ -101,13 +107,31 @@ export async function mainnetPortfolioReply(db: DatabaseSync, account: string) {
     if (current?.status !== "active" || current.address !== wallet.address)
       return text("Your account changed. Please request the portfolio again.");
     // List held stocks only; the catalogue is long and zero rows add noise.
-    const stocks = result.balances.filter((a) => a.symbol !== "USDC" && a.formatted !== "0");
-    const usdg = result.balances.find((a) => a.symbol === "USDC");
+    const stocks = result.balances.filter((a) => a.symbol !== "USDC" && a.balance > 0n);
+    const usdc = result.balances.find((a) => a.symbol === "USDC")?.balance ?? 0n;
+    // Value each holding at Robinhood's live bid: roughly what selling it now would return.
+    const values = await Promise.all(
+      stocks.map((a) =>
+        mainnetReferencePrice(a.symbol as MainnetStock)
+          .then((p) => (a.balance * p.bid) / 10n ** 18n)
+          .catch(() => null),
+      ),
+    );
     const stockLines = stocks.length
-      ? stocks.map((a) => `${a.symbol}: ${a.formatted} tokens`).join("\n")
-      : "No stock tokens yet.";
+      ? stocks
+          .map((a, i) => {
+            const value = values[i];
+            const name = MAINNET_ASSETS[a.symbol as MainnetStock].name;
+            return `${name} (${a.symbol}): ${shareAmount(a.balance)} shares${value === null ? "" : ` ≈ ${referenceDollars(value, 18)}`}`;
+          })
+          .join("\n")
+      : "No stocks yet.";
+    const usdcValue = usdc * 10n ** 12n;
+    const total = values.every((v) => v !== null)
+      ? values.reduce((sum: bigint, v) => sum + (v ?? 0n), usdcValue)
+      : null;
     return text(
-      `Your Pollenstocks holdings · Arc\n\n${stockLines}\nUSDC: ${usdg?.formatted ?? "0"}\n\nWallet: ${wallet.address}\nStock quantities shown are raw token balances.`,
+      `Your Pollenstocks holdings · Arc\n\n${stockLines}\nUSDC: ${referenceDollars(usdcValue, 18)}${total === null ? "" : `\n\nTotal ≈ ${referenceDollars(total, 18)}`}\n\nWallet: ${wallet.address}\nStock values use Robinhood's live bid, before fees.`,
     );
   } catch (error) {
     console.warn("Balance read failed", {
