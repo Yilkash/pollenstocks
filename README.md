@@ -57,6 +57,17 @@ Pollenstocks:  Trade complete ✅  https://explorer.arc.io/tx/0x…
 - **Proven backing.** Before every review and again before sending, Pollenstocks reads the token's supply on Arc and the vault's holdings on Robinhood Chain. If the vault doesn't cover the supply, it won't trade.
 - **Plain language.** SERV Reasoning understands "buy nvidia with five dollars" or "sell 0.01 nvdia", behind a prompt-injection guard.
 
+## 📱 Live on WhatsApp
+
+<p align="center">
+  <img src="apps/web/public/images/whatsapp-stocks.jpg" width="200" alt="The eight stocks, each backed 1:1"/>
+  <img src="apps/web/public/images/whatsapp-buy-review.jpg" width="200" alt="A 1 USDC NVIDIA buy review with the vault verified"/>
+  <img src="apps/web/public/images/whatsapp-sell-review.jpg" width="200" alt="A sale review for 0.002 NVIDIA"/>
+  <img src="apps/web/public/images/whatsapp-sell-receipt.jpg" width="200" alt="The sale receipt with an Arc explorer link"/>
+</p>
+
+Real trades on Arc mainnet: [buy NVIDIA](https://explorer.arc.io/tx/0x05844692f71f3ae91881b834d5ea2d272e6b5469cc9527eb20b81e933e334236) · [sell NVIDIA](https://explorer.arc.io/tx/0x98adb55e84343a628b77834b2b33e32c9979bc3c31c8e7a1697e0d0c90aec462) · [buy Tesla](https://explorer.arc.io/tx/0x7c94c5617751d7a35cdd581b9eb2ff2027cefc726cb83bddee44f212bf50c109)
+
 ## 💬 Things you can say
 
 ```text

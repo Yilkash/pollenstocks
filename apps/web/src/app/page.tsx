@@ -3,11 +3,13 @@ import {
   BadgeCheck,
   Bot,
   Github,
+  Landmark,
   Lock,
   MessageCircle,
   Scale,
   ShieldCheck,
   Timer,
+  Vault,
 } from "lucide-react";
 import { publicStats } from "@/server/public-stats";
 import { MAINNET_ASSETS, MAINNET_STOCK_SYMBOLS } from "@/server/networks/chain";
@@ -18,6 +20,47 @@ export const dynamic = "force-dynamic";
 
 const WHATSAPP = "https://wa.me/2347062750162?text=Hi";
 const GITHUB = "https://github.com/Yilkash/pollenstocks";
+const tx = (hash: string) => `https://explorer.arc.io/tx/${hash}`;
+
+// How the 1:1 backing is proven before every trade (src/server/stocks/backing.ts).
+const backing = [
+  {
+    icon: Landmark,
+    title: "Count the tokens on Arc",
+    body: "Pollenstocks reads the stock token's total supply on Arc, live.",
+  },
+  {
+    icon: Vault,
+    title: "Count the real shares",
+    body: "It reads how many Robinhood stock tokens ArcStocks' vault holds on Robinhood Chain.",
+  },
+  {
+    icon: Scale,
+    title: "They must match",
+    body: "If the vault does not cover every token on Arc, the trade is refused. No exceptions.",
+  },
+  {
+    icon: BadgeCheck,
+    title: "Shown on every review",
+    body: "“✅ Backed 1:1: vault verified on Robinhood Chain”, checked again right before sending.",
+  },
+];
+
+// Real trades from a Pollenstocks wallet on Arc mainnet, 4 October 2026.
+const proof = [
+  {
+    label: "Bought NVIDIA with 1 USDC · 0.004242 NVDA",
+    hash: "0x05844692f71f3ae91881b834d5ea2d272e6b5469cc9527eb20b81e933e334236",
+  },
+  {
+    label: "Sold 0.002 NVIDIA for 0.4675 USDC",
+    hash: "0x98adb55e84343a628b77834b2b33e32c9979bc3c31c8e7a1697e0d0c90aec462",
+  },
+  {
+    label: "Bought Tesla with 1 USDC · 0.002669 TSLA",
+    hash: "0x7c94c5617751d7a35cdd581b9eb2ff2027cefc726cb83bddee44f212bf50c109",
+  },
+];
 
 const examples = [
   "Buy NVIDIA with 5 USDC",
@@ -87,8 +130,9 @@ export default function Landing() {
         </a>
         <nav className={styles.links} aria-label="Sections">
           <a href="#how">How it works</a>
+          <a href="#backing">Backing</a>
           <a href="#one-coin">One coin</a>
-          <a href="#safety">Safety</a>
+          <a href="#proof">Proof</a>
           <a href={GITHUB}>GitHub</a>
         </nav>
         <div className={styles.navEnd}>
@@ -184,6 +228,41 @@ export default function Landing() {
           </div>
         </section>
 
+        <section className={styles.section}>
+          <p className={styles.eyebrow}>Live on WhatsApp</p>
+          <h2>Real screens, real money.</h2>
+          <div className={styles.shots}>
+            <figure>
+              <img
+                src="/images/whatsapp-stocks.jpg"
+                alt="Pollenstocks listing the eight stocks, each backed 1:1"
+              />
+              <figcaption>Eight stocks, each backed 1:1</figcaption>
+            </figure>
+            <figure>
+              <img
+                src="/images/whatsapp-buy-review.jpg"
+                alt="Pollenstocks reviewing a 1 USDC NVIDIA buy with the backing verified"
+              />
+              <figcaption>Exact review, vault verified</figcaption>
+            </figure>
+            <figure>
+              <img
+                src="/images/whatsapp-sell-review.jpg"
+                alt="Pollenstocks reviewing a sale of 0.002 NVIDIA"
+              />
+              <figcaption>Selling is just as simple</figcaption>
+            </figure>
+            <figure>
+              <img
+                src="/images/whatsapp-sell-receipt.jpg"
+                alt="Pollenstocks confirming a completed sale with an Arc explorer link"
+              />
+              <figcaption>Receipt with an Arc explorer link</figcaption>
+            </figure>
+          </div>
+        </section>
+
         <section id="how" className={styles.section}>
           <p className={styles.eyebrow}>How it works</p>
           <h2>AI understands. Code checks. You confirm.</h2>
@@ -197,6 +276,31 @@ export default function Landing() {
               </article>
             ))}
           </div>
+        </section>
+
+        <section id="backing" className={styles.section}>
+          <p className={styles.eyebrow}>Backed 1:1, proven live</p>
+          <h2>Don’t take the backing on trust.</h2>
+          <p className={styles.sectionLead}>
+            Every stock token comes from ArcStocks and is minted only against a real Robinhood stock
+            token locked in its vault on Robinhood Chain. Pollenstocks checks this on both chains
+            before every single trade.
+          </p>
+          <div className={styles.grid4}>
+            {backing.map(({ icon: Icon, title, body }, index) => (
+              <article key={title} className={styles.card}>
+                <span className={styles.stepNo}>{index + 1}</span>
+                <Icon size={22} />
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            ))}
+          </div>
+          <p className={styles.note}>
+            Check it yourself: compare NVDA&apos;s supply on Arc (<code>0x0A2d…65f2</code>) with the
+            vault&apos;s balance on Robinhood Chain (<code>0xe77b…1bcd</code>). The commands are in
+            the <a href={`${GITHUB}#-stocks-on-arc`}>README</a>.
+          </p>
         </section>
 
         <section id="one-coin" className={styles.section}>
@@ -216,7 +320,7 @@ export default function Landing() {
             <li className={styles.best}>
               <code>Arc</code>
               <span>USDC only</span>
-              <b>One coin. A trade costs under one cent in fees.</b>
+              <b>One coin. A trade costs about $0.002 in fees.</b>
             </li>
           </ul>
         </section>
@@ -235,6 +339,24 @@ export default function Landing() {
           </div>
         </section>
 
+        <section id="proof" className={styles.section}>
+          <p className={styles.eyebrow}>Don’t trust us, check the chain</p>
+          <h2>Real trades on Arc mainnet</h2>
+          <ul className={styles.proof}>
+            {proof.map(({ label, hash }) => (
+              <li key={hash}>
+                <span>{label}</span>
+                <a href={tx(hash)}>
+                  <code>
+                    {hash.slice(0, 10)}…{hash.slice(-6)}
+                  </code>
+                  <ArrowUpRight size={15} />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+
         <section className={styles.final}>
           <h2>Your first stock is one message away.</h2>
           <p>Say hi, create your account, add a little USDC on Arc, and start owning.</p>
@@ -247,7 +369,7 @@ export default function Landing() {
       <footer className={styles.footer}>
         <span>
           Pollenstocks by Steward Pay · Powered by SERV Reasoning · Stock tokens on Arc are issued
-          by a third party and are not direct share ownership.
+          by ArcStocks and are not direct share ownership.
         </span>
         <nav aria-label="Footer">
           <a href={GITHUB}>
