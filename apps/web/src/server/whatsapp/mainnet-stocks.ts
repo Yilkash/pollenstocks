@@ -148,7 +148,7 @@ export async function mainnetReceiveReply(db: DatabaseSync, account: string) {
   try {
     const wallet = await ensureMainnetWallet(db, account);
     return text(
-      `Your mainnet funding address\n\n${wallet.address}\n\nArc (chain 5042) only.\nSend USDC on Arc. USDC also pays the network fee, so it is the only coin you need.\n${mainnetTradingMessage()}`,
+      `💵 *How to add money*\n\nSend *USDC on the Arc network* to your Pollenstocks wallet:\n\n${wallet.address}\n\n*Already have USDC on another network* (Base, Arbitrum, Ethereum…)? Move it to Arc with a bridge such as Circle's (CCTP) or relay.link. Choose *Arc* as the destination and paste the address above.\n\n*From an exchange?* Withdraw USDC and pick the *Arc* network if it is offered; if not, withdraw to another network and bridge it.\n\n⚠️ Only USDC on Arc (chain 5042). Other coins or networks can be lost.\nUSDC also pays the tiny network fee, so it is the only coin you need. Start with a few dollars, then say “Buy NVIDIA with 1 USDC”.`,
     );
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
