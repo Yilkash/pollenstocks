@@ -10,6 +10,8 @@ Buy and sell **NVIDIA, Circle, GameStop and AMC** stock tokens on **Arc**, Circl
 On Arc, **USDC also pays the network fee**: one coin for everything, no gas token to buy.<br/>
 **Nothing moves until you tap Confirm.**
 
+[![Chat on WhatsApp](https://img.shields.io/badge/Chat_on_WhatsApp-+234_706_275_0162-25D366?style=for-the-badge&logo=whatsapp&logoColor=white)](https://wa.me/2347062750162?text=Hi)
+
 ![Arc](https://img.shields.io/badge/Arc-mainnet_5042-1F4D3D?style=flat-square)
 ![USDC](https://img.shields.io/badge/money_and_gas-USDC-2775CA?style=flat-square)
 ![AI](https://img.shields.io/badge/AI-SERV_Reasoning-6E56CF?style=flat-square)

@@ -16,8 +16,7 @@ import { ThemeToggle } from "./theme-toggle";
 
 export const dynamic = "force-dynamic";
 
-// Set the WhatsApp number once it is connected.
-const WHATSAPP = process.env.NEXT_PUBLIC_WHATSAPP_LINK || "https://wa.me/";
+const WHATSAPP = "https://wa.me/2347062750162?text=Hi";
 const GITHUB = "https://github.com/Yilkash/pollenstocks";
 
 const examples = [
