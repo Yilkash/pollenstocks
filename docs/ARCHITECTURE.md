@@ -1,49 +1,48 @@
 # Architecture
 
-## Ownership
+Pollenstock is one Next.js app plus two background workers (WhatsApp and transactions), started together by `scripts/start-production.mjs`. State lives in SQLite on a persistent volume.
 
-| Directory | Responsibility |
-| --- | --- |
-| apps/web/src/app | Next.js page, layout, styling and API entry point |
-| apps/web/src/components/payments | Balance, send form, chat, review, receive, activity and contacts views |
-| apps/web/src/hooks | Wallet/session state and named user actions |
-| apps/web/src/lib | Browser wallet/API client and shared payment types/validation |
-| apps/web/src/server/routes | Authentication, contacts, payments and chat HTTP handlers |
-| apps/web/src/server/http.ts | Origin-adjacent HTTP helpers, body limit, cookies and rate limit |
-| apps/web/src/server/router.ts | Origin check, authentication boundary and request dispatch |
-| apps/web/src/server/payments.ts | Preflight, draft creation, signing claim and receipt verification |
-| apps/web/src/server/serv.ts | Bounded SERV tool loop; no signing capability |
-| apps/web/src/server/store.ts | SQLite schema, wallet-scoped records and state transitions |
-| contracts | Demo-token source, deploy script and existing contract tests |
+## Message flow
 
-The web app uses viem directly with an injected wallet. SQLite requires a persistent writable disk and Node.js 24+. Contract dependencies are shared Git submodules in the repository-level lib directory.
+1. **Webhook.** `POST /api/whatsapp/webhook` checks Meta's `X-Hub-Signature-25042` and stores the message in an encrypted inbox. The request returns immediately.
+2. **Guard.** Every SERV request carries the `serv_prompt_guard` tool. A flagged message comes back as a refusal, gets a fixed reply, and no tool runs.
+3. **Assistant.** SERV Reasoning receives the conversation and a small set of tools: list stocks, prices, holdings, trade status, the wallet address, contacts, and preparing a trade or a send. None of them can confirm, sign or broadcast.
+4. **Review.** A prepared plan is stored, and the user receives an exact review with **Confirm**, **Details** and **Cancel** buttons. The button carries the plan ID and a one-time token.
+5. **Runner.** A confirmed plan is leased by the transaction worker, validated again, signed by the user's Privy server wallet and broadcast. The runner waits for the receipt, decodes the Kyber `Swapped` event and replies with a Arc explorer link.
+6. **Outbox.** Every reply goes through a durable outbox, so a crash never loses or duplicates a message.
 
-## Payment lifecycle
+## Preparing a trade
 
-1. The user signs a short-lived login challenge; the server issues an HTTP-only session cookie.
-2. A form or SERV tool requests a draft. The server validates the recipient and integer amount, checks balances, simulates the transfer, estimates gas and stores a five-minute draft.
-3. Review shows the full sender, recipient, token, amount and network.
-4. The server atomically claims the draft before the browser opens the wallet. A unique database index permits only one signing/submitted/unknown payment per wallet and chain.
-5. The browser checks the claimed draft against the reviewed details and current wallet. The user's wallet signs and broadcasts.
-6. The browser retains the transaction hash before asking the server to attach it.
-7. The server matches the actual transaction, then requires a successful receipt and matching Transfer event before recording inclusion.
+`prepareMainnetPlan` in `src/server/stocks/mainnet-trade.ts`:
 
-A receipt confirms chain inclusion, not final settlement. The server and SERV hold no wallet private keys.
+1. Checks the amount (6-decimal USDC, trade cap), the token registry (`verifiedMainnetRegistry`) and the chain head freshness.
+2. Builds the KyberSwap route for the pinned stock token and decodes the calldata. Router, executor, recipient, tokens, amounts and deadline must all match.
+3. Checks the route against Robinhood's live bid/ask for the same stock (`fairPriceCheck`): refused if more than 2% worse, if the stock is halted or if the price is unavailable. Off-hours spreads are capped so a very wide ask cannot wave an overpriced buy through.
+4. Estimates gas and sets a fee ceiling. On Arc the native balance is USDC, so a buy needs the USDC it spends plus the fee from one balance.
 
-## State and recovery
+## Token registry
 
-Drafts can expire or advance to signing. A wallet rejection is recorded as rejected. A known hash advances to submitted and then included or failed. An ambiguous result remains unknown; the app must not automatically resend.
+Arc has no official stock-token registry. Each pinned token (NVDA, CRCL, GME, AMC) is verified on-chain before trading: contract code, symbol, 18 decimals and the issuer's owner address. Copycat tokens with the same names exist on Arc; only the pinned addresses are ever used.
 
-The user can recover a transaction hash from browser storage or wallet history. Recovery accepts only the reviewed token transfer and nonce. Receipt refresh is manual. Replacement/cancellation reconciliation and recovery from an unresolved signing attempt without a hash are still unfinished.
+## Validation before signing
 
-## Data and boundaries
+`validateMainnetPlan` runs again inside the runner, right before signing:
 
-Contacts, payments and chat history are scoped to the authenticated wallet; payments and chat history also have a chain ID. Draft creation has a request ID to avoid recreating the same request. These controls do not provide exactly-once execution across independent wallet actions.
+- chain ID 5042, and the token must be the pinned token for the requested stock;
+- the router and executor bytecode hashes must match the pinned values;
+- the live Privy policy must contain exactly the generated rules (`validateMainnetPolicyRules`) and nothing else;
+- the order must not have expired, and the lease must still be held.
 
-Session tokens are stored as hashes. Mutation requests require the configured browser origin. Rate limiting is process-local. Private RPC credentials are not returned in public wallet configuration.
+## Privy policy
 
-SERV receives chat messages and relevant tool outputs. Notes are excluded from transfer calldata but can appear in SERV inputs. The interface discloses this processing.
+`mainnetPolicyRules()` generates the policy from the token list, so the code and the policy cannot drift. Each rule pins chain 5042, the target contract, zero value and the function name:
 
-## Verification status
+- `approve` on USDC and on each of the 27 stock tokens;
+- `swap` on the KyberSwap router;
+- `transfer` on USDC.
 
-Production compilation and contract compilation are separate from behavioral testing. No live deployment, full wallet-to-wallet transfer or authenticated SERV call has been demonstrated yet. See PLAN.md for the remaining acceptance gates.
+## Failure handling
+
+- **Unknown broadcast outcome.** The runner records the nonce before submitting, refuses to sign while the wallet has a pending transaction, and closes an order that never reached the chain as `not_broadcast` instead of retrying blindly.
+- **Gas.** The bid carries 5% headroom over the latest base fee, and the limit comes from an estimate with a margin.
+- **Stale data.** Kyber routes older than 2 minutes, reference prices from a failed refresh and chain heads older than 2 minutes are refused.

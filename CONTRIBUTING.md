@@ -1,4 +1,4 @@
-# Contributing to Steward Pay
+# Contributing to Pollenstock
 
 ## Working conventions
 
