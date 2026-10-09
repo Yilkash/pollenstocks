@@ -182,10 +182,6 @@ export default function Landing() {
           {stats && (
             <>
               <div>
-                <b>{stats.users}</b>
-                <span>users with their own wallet</span>
-              </div>
-              <div>
                 <b>{stats.confirmed}</b>
                 <span>confirmed trades and payments on Arc</span>
               </div>
