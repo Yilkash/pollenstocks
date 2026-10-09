@@ -11,7 +11,6 @@ import {
   Timer,
   Vault,
 } from "lucide-react";
-import { publicStats } from "@/server/public-stats";
 import { MAINNET_ASSETS, MAINNET_STOCK_SYMBOLS } from "@/server/networks/chain";
 import styles from "./landing.module.css";
 import { ThemeToggle } from "./theme-toggle";
@@ -118,7 +117,6 @@ const safety = [
 ];
 
 export default function Landing() {
-  const stats = publicStats();
   return (
     <div className={styles.page}>
       <header className={styles.nav}>
@@ -179,14 +177,6 @@ export default function Landing() {
         </section>
 
         <section className={styles.stats} aria-label="Pollenstocks at a glance">
-          {stats && (
-            <>
-              <div>
-                <b>{stats.confirmed}</b>
-                <span>confirmed trades and payments on Arc</span>
-              </div>
-            </>
-          )}
           <div>
             <b>{MAINNET_STOCK_SYMBOLS.length}</b>
             <span>
